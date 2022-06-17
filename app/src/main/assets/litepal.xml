@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<litepal>
+    <!-- 数据库名字 -->
+    <dbname value="AdhocDevice" />
+    <!-- 数据库版本 -->
+    <version value="1" />
+    <!--  数据库对象  -->
+    <list>
+        <mapping class="com.yang.myapplication.entity.NeighborInfo"></mapping>
+        <mapping class="com.yang.myapplication.entity.TransferMessage"></mapping>
+        <mapping class="com.yang.myapplication.entity.MessageInfo"></mapping>
+        <mapping class="com.yang.myapplication.entity.DeviceInfo"></mapping>
+    </list>
+
+</litepal>

@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">MANET</string>
+    <string name="str_label_btn_send">Send</string>
+    <string name="str_label_btn_cancel">off</string>
+
+    <string name="str_menu_search">Search</string>
+    <string name="str_menu_bluetooth_on">On</string>
+    <string name="none_paired">No devices have been paired</string>
+    <string name="ble_not_supported">doesnt support BLE</string>
+
+
+    <string name="str_menu_scan_devices">Scan Devices</string>
+    <string name="str_menu_msg_clear">Clear</string>
+    <string name="str_menu_msg_back">Back</string>
+
+
+    <string name="str_paired_devices">Paired</string>
+    <string name="str_logger">Logger</string>
+    <string name="str_available_devices">Available</string>
+
+
+</resources>

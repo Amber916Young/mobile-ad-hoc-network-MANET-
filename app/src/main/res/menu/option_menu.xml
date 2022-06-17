@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/menuScan"
+        android:icon="@android:drawable/ic_menu_rotate"
+        android:title="@string/str_menu_scan_devices"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/menu_search"
+        android:icon="@android:drawable/ic_menu_add"
+        android:title="@string/str_menu_search"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/discoverable"
+        android:icon="@android:drawable/stat_sys_data_bluetooth"
+        android:title="@string/str_menu_bluetooth_on"
+        app:showAsAction="always" />
+
+
+    <item
+        android:id="@+id/historyMsg"
+        android:icon="@android:drawable/ic_menu_recent_history"
+        android:title="@string/str_menu_bluetooth_on"
+        app:showAsAction="always" />
+
+
+
+</menu>

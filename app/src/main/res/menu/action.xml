@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/menuScan"
+        android:title="Scan"
+        app:showAsAction="ifRoom" />
+
+
+    <item
+        android:id="@+id/menuDiscover"
+        android:title="Discover"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/menuLogin"
+        android:title="Login"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/menuLogout"
+        android:title="Logout"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/menuMembership"
+        app:showAsAction="ifRoom"
+        android:title="Membership" />
+    <item
+        android:id="@+id/menuAllMANET"
+        app:showAsAction="ifRoom"
+        android:title="All MANETs" />
+    <item
+        android:id="@+id/menuGlobalIP"
+        app:showAsAction="ifRoom"
+        android:title="Global IP address" />
+</menu>
