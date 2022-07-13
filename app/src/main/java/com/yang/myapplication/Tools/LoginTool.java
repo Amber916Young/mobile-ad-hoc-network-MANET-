@@ -1,5 +1,8 @@
 package com.yang.myapplication.Tools;
 
+import android.util.Log;
+
+import com.yang.myapplication.Activity.BluetoothChat;
 import com.yang.myapplication.entity.DeviceInfo;
 import com.yang.myapplication.entity.Response;
 import com.yang.myapplication.http.APIUrl;
@@ -15,6 +18,7 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import rxhttp.RxHttp;
 
 public class LoginTool {
+    private static final String TAG = "LoginTool";
     private static DeviceInfo deviceInfo = null;
     private static String username = null;
 //   .observeOn(AndroidSchedulers.mainThread())
@@ -30,6 +34,7 @@ public class LoginTool {
                 .asClass(Response.class)
                 .subscribe(data -> {
                     if (data.getCode() == 0) {
+                        LitePal.deleteAll(DeviceInfo.class);
                         String r1 = data.getData().toString();
                         HashMap<String,Object> map = JsonUtils.jsonToPojo(r1,HashMap.class);
                         assert map != null;
@@ -43,13 +48,11 @@ public class LoginTool {
                         String role = Objects.requireNonNull(map.get("role")).toString();
                         String MANET_UUID = Objects.requireNonNull(map.get("manet_UUID")).toString();
                         deviceInfo = new DeviceInfo(uuid,username,password,MAC,loginDate,registerDate,status,MANET_UUID,role);
-                        LitePal.deleteAll(DeviceInfo.class);
                         deviceInfo.save();
-
-//                            loadCloudDevice();
+                        BluetoothChat.isupdateUser = true;
                     }
                 }, throwable -> {
-
+                    Log.e(TAG,throwable.toString());
 
                 });
     }

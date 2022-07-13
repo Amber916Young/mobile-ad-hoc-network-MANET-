@@ -23,8 +23,10 @@ public class DeviceInfo  extends LitePalSupport implements Serializable  {
     private String manet_UUID;
     private String role;
 
+    public DeviceInfo() {
+    }
 
-    public DeviceInfo(String uuid, String username, String password, String mac, String loginDate, String registerDate, String status, String manet_UUID,String role) {
+    public DeviceInfo(String uuid, String username, String password, String mac, String loginDate, String registerDate, String status, String manet_UUID, String role) {
         this.uuid = uuid;
         this.username = username;
         this.password = password;
@@ -58,14 +60,6 @@ public class DeviceInfo  extends LitePalSupport implements Serializable  {
 
     public void setRole(String role) {
         this.role = role;
-    }
-
-    public String getmanet_UUID() {
-        return manet_UUID;
-    }
-
-    public void setmanet_UUID(String manet_UUID) {
-        this.manet_UUID = manet_UUID;
     }
 
     public String getUuid() {

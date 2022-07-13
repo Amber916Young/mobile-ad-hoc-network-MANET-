@@ -16,10 +16,12 @@ import androidx.recyclerview.widget.RecyclerView;
 //import com.yang.myapplication.entity.Message;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
@@ -39,6 +41,7 @@ import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import com.alibaba.fastjson.JSONArray;
 import com.yang.myapplication.Adapter.MessageAdapter;
 import com.yang.myapplication.Adapter.NeighborAdapter;
 import com.yang.myapplication.Interface.RecycleViewInterface;
@@ -64,42 +67,38 @@ import org.json.JSONObject;
 import org.litepal.LitePal;
 import org.litepal.tablemanager.callback.DatabaseListener;
 
-import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.UUID;
-import rxhttp.RxHttp;
+import java.util.concurrent.atomic.AtomicReference;
+
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import rxhttp.RxHttp;
 
 
 public class BluetoothChat extends AppCompatActivity implements RecycleViewInterface {
     private Context context;
-    private BluetoothAdapter bluetoothAdapter;
-    private  final int LOCATION_PERMISSION_REQUEST = 101;
-    private  final int SELECT_DEVICE = 102;
+    private BluetoothAdapter bluetoothAdapter = null;
     public static final int MESSAGE_STATE_CHANGE = 0;
     public static final int MESSAGE_READ = 1;
     public static final int MESSAGE_WRITE = 2;
     public static final int MESSAGE_DEVICE_NAME = 3;
     public static final int MESSAGE_TOAST = 4;
-
     private String connectedDevice;
     public static final String DEVICE_NAME = "deviceName";
     public static final String TOAST = "toast";
     private ChatUtils chatUtils = null;
-
-
     private ListView listMainChat;
     private EditText edCreateMessage;
-
     private Button button_send ,button_cancel,button_transfer,button_net_send;
+
+
     private Handler handler = new Handler(new Handler.Callback() {
         @Override
         public boolean handleMessage(@NonNull Message message) {
@@ -107,27 +106,17 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
                 case MESSAGE_STATE_CHANGE:
                     switch (message.arg1) {
                         case ChatUtils.STATE_NONE:
-                            setState("Not Connected");
-                            MessageDB.checkUnSendMessage(localName,localMacAddress);
+                            setState("UN");
                             break;
                         case ChatUtils.STATE_LISTEN:
-                            setState("Not Connected");
+                            setState("UN");
                             break;
                         case ChatUtils.STATE_CONNECTING:
-                            setState("Connecting");
+                            setState("ING");
                             break;
                         case ChatUtils.STATE_CONNECTED:
-                            setState("Connected: " + connectedDevice);
-                            if(localName.equals(ownerName)){
-//                                if(!tagWitch.contains(connectedDevice)){
-//                                    tagWitch.add(connectedDevice);
-//                                    sendBroadcastMessage();
-//                                }
-                                cloudMessageResendOwn();
-                                if(label.equals("")){
-                                    handleUnreadMessage();
-                                }
-                            }
+                            setState( connectedDevice);
+//                            setState("Connected: " + connectedDevice);
                             break;
                     }
                     break;
@@ -138,11 +127,7 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
                     if(inputBuffer.contains("FLAG") ) {
                         handlerFALGMsg(inputBuffer);
                         break;
-                    } else if (inputBuffer.contains("#")) {
-                        Log.d(TAG,"creating neighbor table");
-                        receiveBroadcastMessage(inputBuffer);
-                        break;
-                    }else if (inputBuffer.contains("@")) {
+                    } else if (inputBuffer.contains("@")) {
                         handleMultihop(inputBuffer);
                         break;
                     } else if (inputBuffer.contains("&"))  {
@@ -166,16 +151,29 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
 //                   Log.d(TAG,"MESSAGE_WRITE:"+writeMessage);
                     if(writeMessage.contains("&") && writeMessage.contains("FLAG")){
                         break;
-                    } else if (writeMessage.contains("#") ) {
-                        break;
                     } else if (writeMessage.contains("@")) {
-                        String SOURCENAME = transferMessage.split("@")[3];
-                        String ACK = transferMessage.split("@")[8];
-                        if (SOURCENAME.equals(localName) && ACK.equals("0")) {
-                            if (MessageDB.storeMessageTheFirstHop(transferMessage, 0)) {
-                                reLoadMessageFromDB();
+                        /* *
+                         * 0 ID
+                         * 1 MESSAGE
+                         * 2 START
+                         * 3 END
+                         * 4 DESNAME
+                         * 5 DESMAC
+                         * 6 SOURCENAME
+                         * 7 SOURCEMAC
+                         * 8 Router [A,B,C,D]
+                         * 9 UPLOAD
+                         * */
+                        String[] tmp = writeMessage.split("@");
+                        if(tmp.length > 4){
+                            String SOURCENAME = tmp[6];
+                            if (SOURCENAME.equals(localName)) {
+                                if (MessageDB.storeMessage(writeMessage)) {
+                                    reLoadMessageFromDB();
+                                }
                             }
                         }
+
                         break;
                     } else if (writeMessage.contains("&")) {
                         //TODO  P2P
@@ -309,82 +307,28 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
         }
     }
 
-    private void  handleUnreadMessage(){
-        MessageDB.CheckMSGFromCloud(localName,connectedDevice,"Sourceunread",chatUtils,localMacAddress);
-        MessageDB.CheckMSGFromCloud(localName,connectedDevice,"Targetunread",chatUtils,localMacAddress);
-    }
-
     private String label="";
     private void setState(CharSequence subTitle){
+        Objects.requireNonNull(getSupportActionBar()).setSubtitle(subTitle);
 
-        if(label.equals("")){
-            Objects.requireNonNull(getSupportActionBar()).setSubtitle(subTitle);
-        }else {
-            if(subTitle.equals("Not Connected"))
-                Objects.requireNonNull(getSupportActionBar()).setSubtitle(label);
-            else
-                Objects.requireNonNull(getSupportActionBar()).setSubtitle(label+"-"+subTitle);
-        }
+//        if(label.equals("")){
+//            Objects.requireNonNull(getSupportActionBar()).setSubtitle(subTitle);
+//        }else {
+//            if(subTitle.equals("Not Connected"))
+//                Objects.requireNonNull(getSupportActionBar()).setSubtitle(label);
+//            else
+//                Objects.requireNonNull(getSupportActionBar()).setSubtitle(label+"-"+subTitle);
+//        }
     }
 
 
-    //当存在连接的时候重发信息，是owner发消息，而不是
-    private void cloudMessageResendOwn(){
-        List<MessageInfo> isReadlist =  MessageDB.queryAllUnreadMsgDB("0",2);
-        System.err.println("isReadlist====="+isReadlist.size());
-        if (isReadlist.size()==0){
-            return;
-        }
-        for(MessageInfo info : isReadlist) {
-            String ID = info.getUuid();
-            String MESSAGE = info.getContent();
-            String SOURCENAME = info.getSourceName();
-            String SOURCMAC = info.getSourceMAC();
-            String TAREGETNAME = info.getTargetName();
-            String TARGETMAC = info.getTargetMAC();
-            String START = info.getSendDate();
-            String END = info.getReadDate();
-            String tmp = ProtocolModel.directMsg;
-            tmp = tmp.replaceAll("MESSAGE", MESSAGE).replaceAll("SOURCENAME", SOURCENAME)
-                    .replaceAll("SOURCMAC", SOURCMAC).replaceAll("TAREGETNAME", TAREGETNAME).replaceAll("TARGETMAC", TARGETMAC)
-                    .replaceAll("START", START).replaceAll("ID", ID);
 
-            //自己发给别人的
-            if (info.getTargetName().equals(connectedDevice) && info.getSourceName().equals(localName)) {
-                tmp = tmp.replaceAll("END", "END").replaceAll("ACK", "0");
-                chatUtils.write(tmp.getBytes());
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                continue;
-            }
-            //自己的消息 返回ACK
-            if (info.getTargetName().equals(localName) && info.getSourceName().equals(connectedDevice)) {
-                END = TimeParse.stampToDate(TimeParse.getTimestamp());
-                tmp = tmp.replaceAll("END", END).replaceAll("ACK", "1");
-                chatUtils.write(tmp.getBytes());
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                continue;
-            }
-        }
-
-
-    }
 
     private static RecyclerView neighborView;
     private static List<NeighborInfo> allDevice = new ArrayList<>();
-    public static void loadTestRouterTool(){
 
-    }
 
     public void updateView() {
-        allDevice.clear();
         List<NeighborInfo> list = LitePal.findAll(NeighborInfo.class);
         if(list.size()>0){
             allDevice.addAll(list);
@@ -395,195 +339,329 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
             neighborView.setAdapter(adapter);
         }
     }
-
-
     int count  = 0;
-    private void ConnectNextDevice(String LASTNAME,int times,String msg){
-        count = 0;
-        Timer timer = new Timer();
-        Timer timer2 = new Timer();
-        timer.schedule(new TimerTask() {
-            public void run() {
-                if (chatUtils.getState() == ChatUtils.STATE_CONNECTED){
-                    timer.cancel();
-                    timer2.cancel();
-                    chatUtils.write(msg.getBytes());
-                }
-                if(count==times){
-                    timer.cancel();
-                    timer2.cancel();
+    private void sendFeedback(String inputBuffer, String  upload, String END ){
+        String[] strings = inputBuffer.split("@");
+        String feedback_model = ProtocolModel.Multi_hop_feedback;
+        String ID = strings[0];
+        String MESSAGE = strings[1];
+        String START = strings[2];
+        String DESNAME = strings[4];
+        String DESMAC = strings[5];
+        String SOURCENAME = strings[6];
+        String SOURCEMAC = strings[7];
+        String ROUTER = strings[8];
+        String[] routers = RouterTool.routerList(ROUTER);
+        MessageInfo message = new MessageInfo(ID, MESSAGE, START, END, 1, DESNAME, DESMAC, SOURCENAME, SOURCEMAC);
+        if (MessageDB.storeMessage(ID, message)) {
+            reLoadMessageFromDB();
+        }
+        feedback_model = feedback_model.replaceAll("UPLOAD", upload).replaceAll("ID", ID).replaceAll("END", END).replaceAll("ROUTER", ROUTER);
+        if (chatUtils != null && chatUtils.getState() == ChatUtils.STATE_CONNECTED) {
+            chatUtils.write(feedback_model.getBytes());
+        } else {
+            multiConnection(routers[routers.length - 2], feedback_model);
+        }
+    }
+
+    private void sendNextDevice(String inputBuffer,String[] routers,int i , String upload){
+        String model =  ProtocolModel.Multi_hop;
+        String[] strings = inputBuffer.split("@");
+        String ID = strings[0];
+        String MESSAGE = strings[1];
+        String START = strings[2];
+        String END = "END";
+        String DESNAME = strings[4];
+        String DESMAC = strings[5];
+        String SOURCENAME = strings[6];
+        String SOURCEMAC = strings[7];
+        String ROUTER = strings[8];
+        model =  model.replaceAll("ID", ID)
+                .replaceAll("MESSAGE", MESSAGE)
+                .replaceAll("START", START)
+                .replaceAll("END", END)
+                .replaceAll("DESNAME", DESNAME)
+                .replaceAll("DESMAC", DESMAC)
+                .replaceAll("SOURCENAME", SOURCENAME)
+                .replaceAll("SOURCEMAC", SOURCEMAC).replaceAll("ROUTER", ROUTER)
+                .replaceAll("UPLOAD", upload);
+        if (chatUtils != null && chatUtils.getState() == ChatUtils.STATE_CONNECTED) {
+            chatUtils.stop();
+        }
+        multiConnection(routers[i+1], model);
+    }
+    private void sendNextDeviceFeedback(String inputBuffer, String nextRouter){
+        String[] strings = inputBuffer.split("@");
+        String ID = strings[0];
+        String END = strings[1];
+        String ROUTER = strings[2];
+        String model =  ProtocolModel.Multi_hop_feedback;
+        model =  model.replaceAll("ID", ID)
+                .replaceAll("ROUTER", ROUTER)
+                .replaceAll("UPLOAD", "1")
+                .replaceAll("END", END);
+        multiConnection(nextRouter, model);
+    }
+
+    private void arriveMessage(String ID, String END){
+        MessageDB.checkUnSendMessageMulti(ID, END);
+        if (MessageDB.storeMessage(ID, END)) {
+            reLoadMessageFromDB();
+        }
+    }
+    private void constructNeighbor(String ROUTER) {
+        String[] routers = RouterTool.routerList(ROUTER);
+        int index = -1;
+        for (int i = 0; i < routers.length; i++) {
+            String cur = routers[i].trim().replaceAll(" ", "");
+            if (cur.equals(localName)) {
+                index = i;
+                break;
+            }
+        }
+        for (int i = 0; i < index; i++) {
+            List<String> routing = new ArrayList<>();
+            for (int j = i; j <= index; j++) {
+                String tmp = routers[j].trim().replaceAll(" ", "");
+                routing.add(tmp);
+            }
+            //one hop
+            if (routing.size() > 2) {
+                String name = routing.get(0);
+                List<NeighborInfo> exists = LitePal.where("neighborName = ?", name).find(NeighborInfo.class);
+                if(exists.size() == 0){
+                    NeighborInfo neighbor = new NeighborInfo("", name, routing.size()-1, new Date(), routing.toString());
+                    neighbor.save();
+                }else if(exists.size() == 1){
+                    NeighborInfo neighbor = new NeighborInfo();
+                    neighbor.setHop(routing.size()-1);
+                    neighbor.setPath( routing.toString());
+                    neighbor.updateAll("neighborName = ?", name);
                 }
             }
-        }, 0,  300);
+        }
+        for (int i = routers.length ; i >= index; i--) {
+            List<String> routing = new ArrayList<>();
+            for (int j = index; j < i; j++) {
+                String tmp = routers[j].trim().replaceAll(" ", "");
+                routing.add(tmp);
+            }
+            //one hop
+            if (routing.size() > 1) {
+                String name = routing.get(routing.size() - 1);
+                List<NeighborInfo> exists = LitePal.where("neighborName = ?", name).find(NeighborInfo.class);
+                if(exists.size() == 0){
+                    NeighborInfo neighbor = new NeighborInfo("", name, routing.size()-1, new Date(), routing.toString());
+                    neighbor.save();
+                }else if(exists.size() == 1){
+                    NeighborInfo neighbor = new NeighborInfo();
+                    neighbor.setHop(routing.size()-1);
+                    neighbor.setPath( routing.toString());
+                    neighbor.updateAll("neighborName = ?", name);
+                }
 
+            }
+        }
+        updateView();
+    }
+    private void handleMultihop(String inputBuffer) {
+        String[] strings = inputBuffer.split("@");
+        label = "multi_hop";
+        if (strings.length > 4) {
+            String DESNAME = strings[4];
+            String ROUTER = strings[8];
+            String SOURCENAME = strings[6];
+            String UPLOAD = strings[9];
+            String[] routers = RouterTool.routerList(ROUTER);
+            for (int i = 1; i < routers.length; i++) {
+                String cur = routers[i].trim().replaceAll(" ", "");
+                if(cur.equals(localName) && cur.equals(DESNAME)) {
+                    String END = TimeParse.stampToDate(TimeParse.getTimestamp());
+                    if (UPLOAD.equals("0")) {
+                        try {
+                            String api = APIUrl.APICloudSendUnreadMessage;
+                            JSONObject jsonObject = new JSONObject();
+                            jsonObject.put("msg", inputBuffer);
+                            jsonObject.put("isRead", "1");
+                            jsonObject.put("readDate", END);
+                            jsonObject.put("uploadName", localName);
+                            jsonObject.put("uploadMAC", localMacAddress);
+                            String uploadTime = TimeParse.stampToDate(TimeParse.getTimestamp());
+                            jsonObject.put("uploadTime", uploadTime);
+                            RxHttp.postJson(api).addAll(jsonObject.toString())
+                                    .asClass(Response.class)
+                                    .observeOn(AndroidSchedulers.mainThread())
+                                    .subscribe(data -> {
+                                        if (data.getCode() == 0) {
+                                            sendFeedback(inputBuffer, "1",END);
+                                        }
+                                    }, throwable -> {
+                                        Log.d(TAG, throwable.toString());
+                                        sendFeedback(inputBuffer, "0",END);
+                                    });
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                            sendFeedback(inputBuffer, "0",END);
+                        }
+                    } else {
+                        sendFeedback(inputBuffer, "0",END);
+                    }
+                   break;
+                }
+
+                if(cur.equals(localName)) {
+                    int index = i;
+                    if (UPLOAD.equals("0")) {
+                        try {
+                            String api = APIUrl.APICloudSendUnreadMessage;
+                            JSONObject jsonObject = new JSONObject();
+                            jsonObject.put("msg", inputBuffer);
+                            jsonObject.put("isRead", "0");
+                            jsonObject.put("uploadName", localName);
+                            jsonObject.put("uploadMAC", localMacAddress);
+                            String uploadTime = TimeParse.stampToDate(TimeParse.getTimestamp());
+                            jsonObject.put("uploadTime", uploadTime);
+                            RxHttp.postJson(api).addAll(jsonObject.toString())
+                                    .asClass(Response.class)
+                                    .observeOn(AndroidSchedulers.mainThread())
+                                    .subscribe(data -> {
+                                        if (data.getCode() == 0) {
+                                            sendNextDevice(inputBuffer, routers, index, "1");
+                                        }
+                                    }, throwable -> {
+                                        Log.d(TAG, throwable.toString());
+                                        sendNextDevice(inputBuffer, routers, index, "0");
+                                    });
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                            sendNextDevice(inputBuffer, routers, index, "0");
+                        }
+                    } else {
+                        sendNextDevice(inputBuffer, routers, index, "1");
+                    }
+                    break;
+
+                }
+            }
+            if(!localName.equals(SOURCENAME)){
+                constructNeighbor(ROUTER);
+            }
+
+        } else {
+            String ID = strings[0];
+            String END = strings[1];
+            String ROUTER = strings[2];
+            String[] routers = RouterTool.routerList(ROUTER);
+            String UPLOAD = strings[3];
+            if (chatUtils != null && chatUtils.getState() == ChatUtils.STATE_CONNECTED) {
+                chatUtils.stop();
+            }
+            for (int i = routers.length - 1; true; i--) {
+                if (routers[0].trim().replaceAll(" ", "").equals(localName)) {
+                    if (UPLOAD.equals("0")) {
+                        try {
+                            String api = APIUrl.APIDeleteMessage;
+                            JSONObject jsonObject = new JSONObject();
+                            jsonObject.put("uuid", ID);
+                            RxHttp.postJson(api).addAll(jsonObject.toString())
+                                    .asClass(Response.class)
+                                    .observeOn(AndroidSchedulers.mainThread())
+                                    .subscribe(data -> {
+                                        if (data.getCode() == 0) {
+                                            arriveMessage(ID, END);
+                                        }
+                                    }, throwable -> {
+                                        Log.d(TAG, throwable.toString());
+                                        arriveMessage(ID, END);
+                                    });
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                            arriveMessage(ID, END);
+                        }
+                    } else {
+                        arriveMessage(ID, END);
+                    }
+                    break;
+                }
+
+                String cur = routers[i].trim().replaceAll(" ", "");
+                if (cur.equals(localName)) {
+                    int index = i;
+                    if (UPLOAD.equals("0")){
+                        try {
+                            String api = APIUrl.APIUpdateMessage;
+                            JSONObject jsonObject = new JSONObject();
+                            jsonObject.put("uuid", ID);
+                            jsonObject.put("isRead", "1");
+                            jsonObject.put("readDate", END);
+                            RxHttp.postJson(api).addAll(jsonObject.toString())
+                                    .asClass(Response.class)
+                                    .observeOn(AndroidSchedulers.mainThread())
+                                    .subscribe(data -> {
+                                        if (data.getCode() == 0) {
+                                            sendNextDeviceFeedback(inputBuffer,routers[index-1]);
+                                        }
+                                    }, throwable -> {
+                                        multiConnection(routers[index-1], inputBuffer);
+                                    });
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                            multiConnection(routers[index-1], inputBuffer);
+                        }
+                    }else {
+                        multiConnection(routers[index-1], inputBuffer);
+                    }
+
+                    break;
+                }
+            }
+        }
+    }
+
+    private  String localName = null;
+
+
+    private void multiConnection(String name,String msg) {
+        Timer timer = new Timer();
+        count = 0;
+        name = name.trim();
+        if (pairedDevicesSet.size() == 0) {
+            Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+            pairedDevicesSet = new ArrayList<>(pairedDevices);
+        }
         for (BluetoothDevice device : pairedDevicesSet) {
-            if (!device.getName().equals(LASTNAME)) {
-                timer2.schedule(new TimerTask() {
+            if (device.getName().equals(name)) {
+                timer.schedule(new TimerTask() {
                     public void run() {
                         chatUtils.connect(device, label);
                         count++;
                     }
-                }, 0,  2000);
+                }, 0, 4000);
+                break;
             }
         }
-    }
-
-
-
-//    private void handleMultihopCloudMessage(String inputBuffer){
-//        String[] strings = inputBuffer.split("@");
-//        String model = ProtocolModel.cloudMultihop;
-//        label = "multi_hop";
-//        Response isFlag = MessageDB.updatecloudMessage(inputBuffer,localName);
-//        if(isFlag.getCode()== -1){
-//            return;
-//        }
-//        if(isFlag.getCode()== 0){
-//            if (chatUtils!=null && chatUtils.getState() == ChatUtils.STATE_CONNECTED) {
-//                chatUtils.stop();
-//            }
-//            reLoadMessageFromDB();
-//            return;
-//        }
-//        if(isFlag.getCode()== 1){
-//            String LASTNAME = strings[4];
-//            model = String.valueOf(isFlag.getData());
-//            if (chatUtils!=null && chatUtils.getState() == ChatUtils.STATE_CONNECTED) {
-//                chatUtils.stop();
-//            }
-//            ConnectNextDevice(LASTNAME,3,model);
-//            return;
-//        }
-//    }
-
-    private void handleMultihop(String inputBuffer) {
-        String[] strings = inputBuffer.split("@");
-        String model = ProtocolModel.Multihop;
-        label = "multi_hop";
-        String LASTNAME = strings[4];
-
-        Response isFlag = MessageDB.storeMessageMultiHop(inputBuffer,localName);
-        if(isFlag.getCode() == -1){
-            return;
-        }
-        if(isFlag.getCode() == 1){
-            //transfering
-            Toast.makeText(context, "transferring: the "+Integer.parseInt(strings[5]) +" hop", Toast.LENGTH_SHORT).show();
-            if (chatUtils!=null && chatUtils.getState() == ChatUtils.STATE_CONNECTED) {
-                chatUtils.stop();
-            }
-            ConnectNextDevice(LASTNAME,5, String.valueOf(isFlag.getData()));
-        }
-        if(isFlag.getCode() == 2){
-            reLoadMessageFromDB();
-
-            //return 消息
-            String[] tmp = String.valueOf(isFlag.getData()).split("@");
-            //destination
-            String MESSAGE = tmp[0];
-            String NEIGHBORMAC = tmp[1];
-            String NEIGHBORNAME = tmp[2];
-            String SOURCENAME = tmp[3];
-            String start = tmp[6];
-            String end = tmp[7];
-            String ID = tmp[9];
-            String ORGINAL = tmp[10];
-            String SOURCEMAC = tmp[11];
-
-            //send ack
-            model = model.replaceAll("ID",ID)
-                    .replaceAll("ACK","1").replaceAll("SOURCENAME",NEIGHBORNAME)
-                    .replaceAll("SOURCEMAC",NEIGHBORMAC).replaceAll("NEIGHBORNAME",SOURCENAME)
-                    .replaceAll("NEIGHBORMAC",SOURCEMAC).replaceAll("END",end)
-                    .replaceAll("START",start).replaceAll("HOP",ORGINAL)
-                    .replaceAll("ORGINAL",ORGINAL).replaceAll("LASTNAME",localName)
-                    .replaceAll("MESSAGE",MESSAGE);
-            transferMessage = model;
-            chatUtils.write(model.getBytes());
-        }
-        if(isFlag.getCode() == 3){
-            if (chatUtils!=null && chatUtils.getState() == ChatUtils.STATE_CONNECTED) {
-                chatUtils.stop();
-            }
-            ConnectNextDevice(LASTNAME,5,String.valueOf(isFlag.getData()));
-        }
-        if(isFlag.getCode() == 4){
-            String[] tmp = String.valueOf(isFlag.getData()).split("@");
-            String ID = tmp[9];
-            String MESSAGE = tmp[0];
-            String start = tmp[6];
-            String end = tmp[7];
-            String NEIGHBORMAC = tmp[1];
-            String NEIGHBORNAME = tmp[2];
-            String SOURCENAME = tmp[3];
-            String SOURCEMAC = tmp[11];
-            if (chatUtils!=null && chatUtils.getState() == ChatUtils.STATE_CONNECTED) {
-                chatUtils.stop();
-            }
-            //多跳的ACK也就是原目标设备收到目的的ACK，更新到数据库中。
-            MessageDB.checkUnSendMessageMulti(ID,end);
-            MessageInfo message = new MessageInfo(ID, MESSAGE, start, end, 1, SOURCENAME, SOURCEMAC,NEIGHBORNAME ,NEIGHBORMAC);
-            if(MessageDB.storeMessage(ID, message)){
-                reLoadMessageFromDB();
-            }
-        }
-
-    }
-
-    private void receiveBroadcastMessage(String inputBuffer){
-        if(!inputBuffer.contains("#")) return;
-        String[] strings = inputBuffer.split("#");
-        for(String info :strings ){
-            String[] neighbor = info.split(",");
-            String nei_name = neighbor[0];
-            String nei_mac = neighbor[1];
-            int hop = Integer.parseInt(neighbor[2]);
-            String name = neighbor[3];
-            if(!localMacAddress.equals(nei_mac) && !localName.equals(nei_name)){
-                NeighborInfo neighborInfo = new NeighborInfo(nei_mac,nei_name,hop,new Date(),"");
-                List<NeighborInfo> exists = LitePal.where("neighborMac = ?", nei_mac).find(NeighborInfo.class);
-                if(exists.size() >= 1){
-                    LitePal.deleteAll(NeighborInfo.class, "neighborMac = ?" , nei_mac);
-                }
-                neighborInfo.save();
-            }
-            String out = "nei_name  :"+nei_name+" nei_mac:  "+nei_mac+"hop:  "+hop+" localName: "+localName;
-            Log.e("--------",out);
-        }
-        updateView();
-    }
-    private  String localName = null;
-//    private Set<String> tagWitch = new HashSet<>();
-
-    private void sendBroadcastMessage(){
-        List<NeighborInfo> list = LitePal.findAll(NeighborInfo.class);
-        if(list.size()==1) return;
-        StringBuilder sb = new StringBuilder();
-        int index = 1;
-        for(NeighborInfo info : list){
-            String message =JsonUtils.entittyToString(info,localName );
-            sb.append(message);
-            if(index<list.size()) sb.append("#");
-            index++;
-        }
-        if(!sb.toString().isEmpty()){
-            chatUtils.write(sb.toString().getBytes());
-        }
-    }
-
-
-    private void multiConnection(){
-        for(BluetoothDevice info : pairedDevicesSet){
-            if (chatUtils.getState() == chatUtils.STATE_NONE) {
-                if(!info.getName().equals(localName)){
-                    chatUtils.connect(info,label);
+        Timer timer2 = new Timer();
+        timer2.schedule(new TimerTask() {
+            public void run() {
+                if (count > 3 ) {
+                    timer.cancel();
+                    timer2.cancel();
+                } else  if (chatUtils.getState() == ChatUtils.STATE_CONNECTED) {
+                    timer.cancel();
+                    timer2.cancel();
+                    if (!msg.equals("") || msg != null) {
+                        chatUtils.write(msg.getBytes());
+                    }
                 }
             }
-        }
+        }, 0, 300);
+
+
+
     }
+
+
     //{des mac, des name, source name, message,start,end}
-    private static  String transferMessage =  ProtocolModel.Multihop;;
-
     private void isNoneOrShowBtn(int type){
         if(type==1){
             button_transfer.setVisibility(View.GONE);
@@ -599,7 +677,24 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
             button_net_send.setVisibility(View.VISIBLE);
         }
     }
-    private BluetoothDevice directCurrentDevice = null;
+
+
+    //更改路由结构
+    private String combinationRouterPathMultihop(String MESSAGE, String uuid) {
+        String model = ProtocolModel.Multi_hop;
+        String time = TimeParse.stampToDate(TimeParse.getTimestamp());
+        model = model.replaceAll("DESNAME", currentConnectDevice.getNeighborName())
+                .replaceAll("DESMAC", currentConnectDevice.getNeighborMac())
+                .replaceAll("SOURCENAME", localName)
+                .replaceAll("SOURCEMAC", localMacAddress)
+                .replaceAll("ID", uuid)
+                .replaceAll("START", time)
+                .replaceAll("MESSAGE", MESSAGE)
+                .replaceAll("ROUTER", currentConnectDevice.getPath());
+        return model;
+    }
+
+    NeighborInfo currentConnectDevice = null;
 
     @Override
     public void onItemClickPair(int position) {
@@ -609,78 +704,38 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
             Toast.makeText(context, "Please finish the scanning", Toast.LENGTH_SHORT).show();
             return;
         }
-        if(position >= pairedDevicesSet.size()){
+        if (chatUtils != null && chatUtils.getState() == ChatUtils.STATE_CONNECTED) {
+            chatUtils.stop();
+        }
+        NeighborInfo tmp = list.get(position);
+        if (tmp.getHop() == 1){
+            label = "";
+            isNoneOrShowBtn(1);
+            if(pairedDevicesSet.size() == 0){
+                Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+                pairedDevicesSet = new ArrayList<>(pairedDevices);
+            }
+            for (BluetoothDevice device : pairedDevicesSet){
+                if(device.getName().equals(tmp.getNeighborName())){
+                    chatUtils.connect(device,"directly");
+                    currentConnectDevice = tmp;
+                    break;
+                }
+            }
+        }else {
             label = "multihop";
-            NeighborInfo tmp = list.get(position);
-            String model = ProtocolModel.Multihop;
-            model = model.replaceAll("ORGINAL",String.valueOf(tmp.getHop())).replaceAll("HOP",String.valueOf(tmp.getHop()))
-                    .replaceAll("NEIGHBORMAC",tmp.getNeighborMac()).replaceAll("NEIGHBORNAME",tmp.getNeighborName())
-                    .replaceAll("SOURCENAME",localName).replaceAll("SOURCEMAC",localMacAddress);
-            transferMessage = model;
+            currentConnectDevice = tmp;
             chatUtils.setState(ChatUtils.STATE_NONE);
             isNoneOrShowBtn(2);
-            multiConnection();
-        }else {
-            isNoneOrShowBtn(1);
-            if (chatUtils != null) {
-                chatUtils.stop();
-            }
-            directCurrentDevice = pairedDevicesSet.get(position);
-            chatUtils.connect(pairedDevicesSet.get(position),"directly");
+            String[] path = RouterTool.routerList(tmp.getPath());
+            multiConnection(path[1],"");
         }
     }
-
-
-
     @Override
     public void onItemClick(int position) {
-        try {
-            if(NetworkTool.ping("google.com",10)){
-                NeighborInfo current = allDevice.get(position);
-                String api = APIUrl.APIlogin;
-                JSONObject jsonObject = new JSONObject();
-                String targetName = current.getNeighborName();
-                String targetMAC= current.getNeighborMac();
-                try {
-                    jsonObject.put("targetName", targetName);
-                    jsonObject.put("targetMAC", targetMAC);
-                    jsonObject.put("sourceName", localName);
-                    jsonObject.put("sourceMAC", localMacAddress);
-                    jsonObject.put("sendDate", new Date());
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-                RxHttp.postJson(api).addAll(jsonObject.toString())
-                        .asClass(Response.class).observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(data -> {
-                            if(data.getCode()==0){
-                                setState("Connected: " + targetName);
-                                isNoneOrShowBtn(3);
-                                Toast.makeText(getApplicationContext(), "connected", Toast.LENGTH_LONG).show();
-                            }else {
-                                Toast.makeText(getApplicationContext(),"unable to connect", Toast.LENGTH_LONG).show();
-                            }
-                        }, throwable -> {
-                            //请求失败
-                            Log.d(TAG,throwable.toString());
-                            Toast.makeText(getApplicationContext(), "network refused!", Toast.LENGTH_LONG).show();
-                        });
-
-
-
-            }else {
-                Toast.makeText(context, "sorry, the network is unavailable", Toast.LENGTH_SHORT).show();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
-
-
-    public static String ownerName = "Nexus 5";
     private static DeviceInfo deviceInfo = null;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -689,32 +744,73 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
         context = this;
         checkPermissions();
         initBluetooth();
-        if(chatUtils==null){
+        init();
+        if(chatUtils == null){
             chatUtils = new ChatUtils(context,handler);
         }
-        init();
-        devicelogin();
-
-
-        scanDevices();
+        cloudNotification();
     }
 
-    //自动登录 。 测试阶段 主要是确定在同一个MANET
-    private void devicelogin() {
+    private void cloudNotification() {
+        Timer timer_enable = new Timer();
+        timer_enable.schedule(new TimerTask() {
+            public void run() {
+                enable();
+            }
+
+        }, 1000, 3000 * 1000);
+        Timer timer = new Timer();
+        timer.schedule(new TimerTask() {
+            public void run() {
+                scanDevices();
+                MessageDB.checkUnSendOrUnreadMessage(localName,localMacAddress);
+            }
+        }, 1000, 30 * 1000);
+
+
+        Timer timerViewupdate = new Timer();
+        timerViewupdate.schedule(new TimerTask() {
+            public void run() {
+                if(isupdateView){
+                    Message msg = new Message();
+                    msg.arg1 = 3;
+                    handlerView.sendMessage(msg);
+                    isupdateView = false;
+                }
+                if(isupdateNeiView){
+                    Message msg = new Message();
+                    msg.arg1 = 2;
+                    handlerView.sendMessage(msg);
+                    isupdateNeiView = false;
+                }
+            }
+        }, 0, 300);
+
+        //TODO 自动登录 。 测试阶段 主要是确定在同一个MANET
+
         Timer resendTimer = new Timer();
         resendTimer.schedule(new TimerTask() {
             public void run() {
                 LoginTool.funclogin(localName);
-                List<DeviceInfo>  list =  LitePal.findAll(DeviceInfo.class);
-                if(list.size()==1) {
-                    deviceInfo = list.get(0);
-                    Thread.currentThread();
+                if(isupdateUser || times>=3){
+                    List<DeviceInfo> list = LitePal.findAll(DeviceInfo.class);
+                    if(list.size()==1){
+                        deviceInfo = list.get(0);
+                    }
+                    isupdateUser = false;
                     resendTimer.cancel();
-
                 }
+                times++;
             }
-        }, 0,  5*1000);
+        }, 0, 3 * 1000);
+
+
     }
+    int times = 0;
+    public static boolean isupdateView = false;
+    public static boolean isupdateNeiView = false;
+    public static boolean isupdateUser = false;
+
 
     private void initDB() {
         LitePal.initialize(this);
@@ -731,13 +827,8 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
     }
 
     private String localMacAddress = "";
-
-//    private ArrayAdapter<String> adapterMainChat ;
     private MessageAdapter adapterMainChat ;
-
     private ProgressBar progress_scan_devices;
-
-
 
     //reload message from DB
     private void reLoadMessageFromDB(){
@@ -766,15 +857,40 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
             @Override
             public void onClick(View view) {
                 String message = edCreateMessage.getText().toString().trim();
-                if(transferMessage.contains("MESSAGE")){
-                    String uuid =String.valueOf(RandomID.genIDWorker());
-                    String time = TimeParse.stampToDate(TimeParse.getTimestamp());
-                    transferMessage =  transferMessage.replaceAll("START",time).replaceAll("ID",uuid).replaceAll("ACK","0").replaceAll("MESSAGE",message);
-                }else {
+                if (!message.isEmpty()) {
+                    String uuid = String.valueOf(RandomID.genIDWorker());
+                    String msg = combinationRouterPathMultihop(message,uuid);
+                    try {
+                        String api = APIUrl.APICloudSendUnreadMessage;
+                        JSONObject jsonObject = new JSONObject();
+                        jsonObject.put("isUpload", "1");
+                        jsonObject.put("msg", msg);
+                        jsonObject.put("uploadName", localName);
+                        jsonObject.put("isRead", "0");
+                        jsonObject.put("uploadMAC", localMacAddress);
+                        String uploadTime = TimeParse.stampToDate(TimeParse.getTimestamp());
+                        jsonObject.put("uploadTime", uploadTime);
+                        RxHttp.postJson(api).addAll(jsonObject.toString())
+                                .asClass(Response.class)
+                                .observeOn(AndroidSchedulers.mainThread())
+                                .subscribe(data -> {
+                                    if (data.getCode() == 0) {
+                                        String com =msg.replaceAll("UPLOAD","1");
+                                        edCreateMessage.setText("");
+                                        chatUtils.write(com.getBytes());
+                                    }
+                                }, throwable -> {
+                                    String com =msg.replaceAll("UPLOAD","0");
+                                    edCreateMessage.setText("");
+                                    chatUtils.write(com.getBytes());
+
+                                });
+                    } catch (JSONException e) {
+                        String com =msg.replaceAll("UPLOAD","0");
+                        edCreateMessage.setText("");
+                        chatUtils.write(com.getBytes());
+                    }
                 }
-                transferMessage = transferMessage.replaceAll("LASTNAME",localName);
-                edCreateMessage.setText("");
-                chatUtils.write(transferMessage.getBytes());
             }
         });
 
@@ -783,11 +899,19 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
             @Override
             public void onClick(View view) {
 
-                if(directCurrentDevice == null && chatUtils.getState() != ChatUtils.STATE_CONNECTED) return;
-                if(directCurrentDevice == null){
+                if(chatUtils.getState() != ChatUtils.STATE_CONNECTED) return;
+                if(currentConnectDevice == null){
+                    BluetoothDevice current = null;
+                    Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+                    pairedDevicesSet = new ArrayList<>(pairedDevices);
                     for(int i =0;i<pairedDevicesSet.size();i++){
                         if(pairedDevicesSet.get(i).getName().equals(connectedDevice) ){
-                            directCurrentDevice = pairedDevicesSet.get(i);
+                            current = pairedDevicesSet.get(i);
+                            currentConnectDevice = new NeighborInfo();
+                            currentConnectDevice.setHop(1);
+                            currentConnectDevice.setNeighborMac(current.getAddress());
+                            currentConnectDevice.setNeighborName(current.getName());
+                            break;
                         }
                     }
                 }
@@ -797,13 +921,15 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
                     edCreateMessage.setText("");
                     label = "";
                     String time = TimeParse.stampToDate(TimeParse.getTimestamp());
-                    String TAREGETNAME = directCurrentDevice.getName();
-                    String TARGETMAC = directCurrentDevice.getAddress();
+                    String TAREGETNAME = currentConnectDevice.getNeighborName() == null ? connectedDevice :  currentConnectDevice.getNeighborName()   ;
+                    String TARGETMAC = currentConnectDevice.getNeighborMac();
                     tmp = tmp.replaceAll("START",time).replaceAll("TAREGETNAME",TAREGETNAME).replaceAll("TARGETMAC",TARGETMAC).replaceAll("ID", String.valueOf(RandomID.genIDWorker())).replaceAll("MESSAGE",message).replaceAll("SOURCENAME",localName).replaceAll("SOURCMAC",localMacAddress).replaceAll("ACK","0");
                     chatUtils.write(tmp.getBytes());
                 }
             }
         });
+
+
         button_cancel.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -819,14 +945,14 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
     @Override
     public void onResume() {
         super.onResume();
-        updateView();
-        scanDevices();
         if (chatUtils != null) {
-            if (chatUtils.getState() == chatUtils.STATE_NONE) {
+            if (chatUtils.getState() == ChatUtils.STATE_NONE) {
                 chatUtils.start();
             }
         }
+        reLoadMessageFromDB();
     }
+
     private void initBluetooth() {
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if(bluetoothAdapter == null){
@@ -841,7 +967,6 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
         return true;
     }
 
-    private final UUID[] UUIDList = new UUID[]{UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"),UUID.fromString("fa87c0d0-afac-11de-8a39-0800200c9a66")};
 
 
     private final static String TAG = "---->";
@@ -858,20 +983,35 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
                         }
                         String address = extras.getString(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
                         BluetoothDevice device = bluetoothAdapter.getRemoteDevice(address);
-                        chatUtils.connect(device,"");
+                        chatUtils.connect(device,label);
                         return;
 
                     }
                 }
             });
 
+    //处理界面
+    private  Handler handlerView = new Handler(){
+        public void handleMessage(android.os.Message msg) {
+            if(msg.arg1 == 1){
+//                progress_scan_devices.setVisibility(View.VISIBLE);
+                Log.e(TAG,"start scan");
+            } else if(msg.arg1 == 2){
+                progress_scan_devices.setVisibility(View.GONE);
+                updateView();
+            } else if(msg.arg1 == 3){
+                reLoadMessageFromDB();
+            }
+        };
+    };
     private void scanDevices(){
-        progress_scan_devices.setVisibility(View.VISIBLE);
-//        reLoadMessageFromDB();
-        listMainChat.setAdapter(adapterMainChat);
-        pairedDevicesSet.clear();
+        Message msg = new Message();
+        msg.arg1 = 1;
+        handlerView.sendMessage(msg);
+
+
         allDevices.clear();
-        LitePal.deleteAll(NeighborInfo.class);
+        pairedDevicesSet.clear();
         registerReceiver(receiver, makeFilters());
         if(bluetoothAdapter.isDiscovering()){
             bluetoothAdapter.cancelDiscovery();
@@ -883,32 +1023,62 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         Intent intent = null;
-        switch (item.getItemId()){
+        switch (item.getItemId()) {
             case R.id.menuScan:
                 scanDevices();
                 break;
             case R.id.menu_search:
-//                intent = new Intent(context,DeviceListActivity.class);
-//                startActivityIntent.launch(intent);
-
-                intent = new Intent(context,DeviceMainActivity.class);
-                Bundle bundle = new Bundle();
-                bundle.putSerializable("username",localName);
-                intent.putExtras(bundle);
-                startActivity(intent);
+                intent = new Intent(context, DeviceListActivity.class);
+                startActivityIntent.launch(intent);
                 break;
             case R.id.discoverable:
                 Toast.makeText(context, "Clicked enable", Toast.LENGTH_SHORT).show();
                 enable();
-                updateView();
+//                try {
+//                    boolean isConnect = NetworkTool.ping(UrlDomain.pingURL,10);
+//                    if (isConnect) {
+//                        RouterTool.getRouterOwne(localName);
+//                        Message msg = new Message();
+//                        msg.arg1 = 2;
+//                        handlerView.sendMessage(msg);
+//                    } else {
+//                        noNetworkOnlyGetOneHopNode();
+//                    }
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+                viewDeviceInfo();
                 break;
             case R.id.historyMsg:
-                intent = new Intent(context,MessageListActivity.class);
+                intent = new Intent(context, MessageListActivity.class);
                 startActivity(intent);
                 break;
         }
         return true;
     }
+
+    private void viewDeviceInfo() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(BluetoothChat.this);
+        DeviceInfo info = LitePal.findFirst(DeviceInfo.class);
+        String title = "device "+info.getUsername() + "'s basic information";
+        builder.setTitle(title);
+        String body = "uuid: "+ info.getUuid()+"\n"
+                +"MANET UUID: "+  info.getManet_UUID()+"\n"
+                + "MAC: "+ info.getMac()+"\n"
+                +"Login date: "+  info.getLoginDate()+"\n"
+                +"Role: "+  info.getRole()+"\n"
+               ;
+        builder.setMessage(body);
+
+        builder.setPositiveButton("YES", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+            }
+        });
+        builder.create().show();
+    }
+
+
     private void enable(){
         if(!bluetoothAdapter.isEnabled()){
             bluetoothAdapter.enable();
@@ -975,6 +1145,20 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
     HashMap<String,BluetoothDevice> allDevices = new HashMap<>();
     List<BluetoothDevice> pairedDevicesSet = new ArrayList<>();
 
+    private void printLog(BluetoothDevice device){
+        String s = "";
+        int BondState = device.getBondState();
+        switch (BondState){
+            case BluetoothDevice.BOND_BONDED:
+                s ="---name：" + device.getName() + "\n" + "MAC：" + device.getAddress() + "\n" + "state：paired" + "\n";
+                break;
+            default:
+                s ="---name：" + device.getName() + "\n" + "MAC：" + device.getAddress() + "\n" + "state：unknown" + "\n";
+                break;
+        }
+        Log.e(TAG,s);
+    }
+
 
     BroadcastReceiver receiver = new BroadcastReceiver() {
         @SuppressLint("NotifyDataSetChanged")
@@ -987,71 +1171,138 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
                 progress_scan_devices.setVisibility(View.GONE);
                 bluetoothAdapter.cancelDiscovery();
                 unregisterReceiver(receiver);
-
-
-                updateSql();
+                getPairedDevices();
             } else if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+//                int rssi = Math.abs(intent.getExtras().getShort(BluetoothDevice.EXTRA_RSSI));
                 String name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME);
+
                 if (name != null) {
-                    int rssi = Math.abs(intent.getExtras().getShort(BluetoothDevice.EXTRA_RSSI));
                     BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                    if(!allDevices.containsKey(device.getAddress())){
-                        allDevices.put(device.getAddress(),device);
-                    }
-                    String s = "";
                     int BondState = device.getBondState();
                     switch (BondState){
                         case BluetoothDevice.BOND_BONDED:
-                            s = "rssi："+ rssi +"---name：" + device.getName() + "\n" + "MAC：" + device.getAddress() + "\n" + "state：paired" + "\n";
-                            break;
-                        default:
-                            s = "rssi："+ rssi +"---name：" + device.getName() + "\n" + "MAC：" + device.getAddress() + "\n" + "state：unknown" + "\n";
+                            if(!allDevices.containsKey(device.getAddress())){
+                                allDevices.put(device.getAddress(),device);
+                                pairedDevicesSet.add(device);
+                            }
                             break;
                     }
-                    Log.e(TAG,s);
+                    printLog(device);
                 }
             }
         }
 
-        private void updateSql() {
-            LitePal.deleteAll(NeighborInfo.class);
-            bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-            Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
-            if(pairedDevices != null && pairedDevices.size()>0){
-                for (BluetoothDevice device : pairedDevices){
-                    pairedDevicesSet.add(device);
-                }
-            }
-            List<NeighborInfo> neighborInfoList = new ArrayList<>();
-            for(BluetoothDevice device : pairedDevicesSet) {
-                String address = device.getAddress();
-                if (allDevices.containsKey(address)) {
-                    NeighborInfo neighbor = new NeighborInfo(address, device.getName(),1,new Date(),"");
-                    neighborInfoList.add(neighbor);
-                }
-            }
-            if(deviceInfo!=null){
-                if(neighborInfoList.size() != 0){
-                    RouterTool.setDeviceInfo(deviceInfo);
-                    RouterTool.uploadRouterNeighbor(neighborInfoList,localName,localMacAddress );
-                }
-            }
 
-
-
-            // owner
-
-//
-//            for(NeighborInfo info : neighborInfoList){
-//                info.save();
-//            }
-//            updateView();
-        }
 
     };
 
+    private void noNetworkOnlyGetOneHopNode(){
+        LitePal.deleteAll(NeighborInfo.class);
+        for (BluetoothDevice device : pairedDevicesSet){
+            String address = device.getAddress();
+            NeighborInfo neighbor = new NeighborInfo(address, device.getName(),1,new Date(),"");
+            neighbor.save();
+        }
+//        if(pairedDevicesSet.size() == 0){
+//            Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+//            if(pairedDevices != null && pairedDevices.size()>0){
+//                for (BluetoothDevice device : pairedDevices){
+//                    String address = device.getAddress();
+//                    NeighborInfo neighbor = new NeighborInfo(address, device.getName(),1,new Date(),"");
+//                    neighbor.save();
+//                }
+//            }
+//        }else {
+//            for (BluetoothDevice device : pairedDevicesSet){
+//                String address = device.getAddress();
+//                NeighborInfo neighbor = new NeighborInfo(address, device.getName(),1,new Date(),"");
+//                neighbor.save();
+//            }
+//        }
+        isupdateNeiView = true;
+    }
 
+    private void getPairedDevices(){
+        List<NeighborInfo> neighborInfoList = new ArrayList<>();
+        for(BluetoothDevice device : pairedDevicesSet) {
+            String address = device.getAddress();
+            NeighborInfo neighbor = new NeighborInfo(address, device.getName(), 1, new Date(), "");
+            neighborInfoList.add(neighbor);
+        }
+        if(deviceInfo!=null){
+            List<DeviceInfo> infos = LitePal.findAll(DeviceInfo.class);
+            RouterTool.setDeviceInfo(infos.get(0));
+            deviceInfo = infos.get(0);
+            String mid = deviceInfo.getManet_UUID();
+            if(neighborInfoList.size() != 0){
+                try {
+                    String api = APIUrl.uploadRouterNeighbor;
+                    JSONObject jsonObject = new JSONObject();
+                    JSONArray jsonArray = new JSONArray(Collections.singletonList(neighborInfoList));
+                    jsonObject.put("MANET_UUID", mid);
+                    jsonObject.put("sourceName", localName);
+                    jsonObject.put("sourceMAC", localMacAddress);
+                    jsonObject.put("neighbors", jsonArray);
+                    RxHttp.postJson(api).addAll(jsonObject.toString())
+                            .asClass(Response.class)
+                            .subscribe(data -> {
+                                if (data.getCode() == 0) {
+                                    String r1 = data.getData().toString();
+                                    HashMap<String,Object> map = JsonUtils.jsonToPojo(r1,HashMap.class);
+                                    String MANET_UUID = map.get("MANET_UUID") == null? "none":map.get("MANET_UUID").toString();
+                                    String userInfo = map.get("userInfo") == null? "member":map.get("userInfo").toString();
+                                    if(!MANET_UUID.equals("none") || !MANET_UUID.equals("")){
+                                        String uuid = deviceInfo.getUuid();
+                                        DeviceInfo info = new DeviceInfo();
+                                        info.setManet_UUID(MANET_UUID);
+                                        info.setRole(userInfo);
+                                        info.updateAll("uuid = ?", uuid);
+                                    }
+                                    String router = map.get("router").toString();
+                                    map = JsonUtils.jsonToPojo(router,HashMap.class);
+                                    String member = map.get("member").toString();
+                                    List<HashMap> memberlist = JsonUtils.jsonToList(member,HashMap.class);
+                                    HashMap<String,String> allnodes = new HashMap<>();
+                                    for(HashMap tp : memberlist){
+                                        String tname = tp.get("sourceName").toString();
+                                        String tMAC = tp.get("sourceMAC") == null ? "none": tp.get("sourceMAC").toString() ;
+                                        allnodes.put(tname,tMAC);
+                                    }
 
+                                    router = map.get("router").toString();
+                                    Log.e(TAG,router);
+                                    List<HashMap> routerlist = JsonUtils.jsonToList(router,HashMap.class);
+                                    LitePal.deleteAll(NeighborInfo.class);
+                                    for(HashMap tp : routerlist){
+                                        int hop = Integer.parseInt(tp.get("hop").toString());
+                                        String tname = tp.get("dest").toString();
+                                        String path = tp.get("path").toString();
+                                        String tMAC = allnodes.get(tname);
+                                        NeighborInfo neighbor = new NeighborInfo(tMAC, tname,hop,new Date(),path);
+                                        neighbor.save();
+                                    }
+                                    isupdateNeiView = true;
+                                }else if(data.getCode() == 2) {
+                                    String MANET_UUID = data.getData() == null ? "none" : data.getData().toString();
+                                    if (!MANET_UUID.equals("none") || !MANET_UUID.equals("")) {
+                                        String uuid = deviceInfo.getUuid();
+                                        DeviceInfo info = new DeviceInfo();
+                                        info.setManet_UUID(MANET_UUID);
+                                        info.updateAll("uuid = ?", uuid);
+                                    }
 
-
+                                }
+                            }, throwable -> {
+                                Log.d(TAG, throwable.toString());
+                                noNetworkOnlyGetOneHopNode();
+                            });
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    noNetworkOnlyGetOneHopNode();
+                }
+            }
+        }else {
+            noNetworkOnlyGetOneHopNode();
+        }
+    }
 }

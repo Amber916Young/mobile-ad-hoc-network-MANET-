@@ -6,8 +6,21 @@
         android:icon="@android:drawable/ic_menu_rotate"
         android:title="@string/str_menu_scan_devices"
         app:showAsAction="always" />
+<!--    <item-->
+<!--        android:id="@+id/menuLeave"-->
+<!--        android:icon="@android:drawable/ic_menu_set_as"-->
+<!--        android:title="@string/str_menu_scan_devices"-->
+<!--        app:showAsAction="always" />-->
+    <item
+        android:id="@+id/menuBack"
+        android:icon="@android:drawable/ic_menu_revert"
+        android:title="@string/str_menu_msg_back"
+        app:showAsAction="always" />
 
-
-
+<!--    <item-->
+<!--        android:id="@+id/menuCreate"-->
+<!--        android:icon="@android:drawable/ic_input_add"-->
+<!--        android:title="@string/str_menu_bluetooth_on"-->
+<!--        app:showAsAction="always" />-->
 
 </menu>

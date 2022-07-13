@@ -32,28 +32,13 @@ public class NeighborAdapter extends  RecyclerView.Adapter<NeighborAdapter.ViewH
     }
     public static class ViewHolder extends RecyclerView.ViewHolder{
         private TextView neighborMac ,neighborName,hop ,timestamp, rssi,myMac,myName;
-        private Button netCommunication;
         public ViewHolder(@NonNull View itemView, RecycleViewInterface recycleViewInterface) {
             super(itemView);
             neighborMac =itemView.findViewById(R.id.neighborMac);
             neighborName =itemView.findViewById(R.id.neighborName);
             hop=itemView.findViewById(R.id.hop);
-            timestamp=itemView.findViewById(R.id.timestamp);
-            netCommunication = itemView.findViewById(R.id.netCommunication);
-//            rssi=itemView.findViewById(R.id.rssi);
-//            myMac=itemView.findViewById(R.id.myMac);
-//            myName=itemView.findViewById(R.id.myName);
-            netCommunication.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    if(recycleViewInterface != null){
-                        int pos = getAdapterPosition();
-                        if(pos != RecyclerView.NO_POSITION){
-//                            recycleViewInterface.onItemClick(pos);
-                        }
-                    }
-                }
-            });
+//            timestamp=itemView.findViewById(R.id.timestamp);
+
 
             itemView.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -75,7 +60,6 @@ public class NeighborAdapter extends  RecyclerView.Adapter<NeighborAdapter.ViewH
         View view = LayoutInflater.from(context).inflate(rowId,parent,false);
         return new ViewHolder(view,recycleViewInterface);
     }
-    //    String neighborMac, String neighborName, int hop, Date timestamp,int rssi,String myMac,String myName
 
     @Override
     public void onBindViewHolder(@NonNull NeighborAdapter.ViewHolder holder, int position) {
@@ -83,7 +67,7 @@ public class NeighborAdapter extends  RecyclerView.Adapter<NeighborAdapter.ViewH
         holder.neighborMac.setText(current.getNeighborMac());
         holder.neighborName.setText(current.getNeighborName());
         holder.hop.setText(String.valueOf(current.getHop()));
-        holder.timestamp.setText(current.getTimestamp().toString());
+//        holder.timestamp.setText(current.getTimestamp().toString());
 //        holder.rssi.setText(String.valueOf(current.getRssi()));
 //        holder.myMac.setText(current.getMyMac());
 //        holder.myName.setText(current.getMyName());

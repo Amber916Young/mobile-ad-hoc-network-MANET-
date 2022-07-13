@@ -6,10 +6,12 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.database.sqlite.SQLiteDatabase;
@@ -28,13 +30,21 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.yang.myapplication.R;
+import com.yang.myapplication.Tools.BluetoothTools;
+import com.yang.myapplication.Tools.NetworkTool;
+import com.yang.myapplication.Tools.RouterTool;
+import com.yang.myapplication.entity.DeviceInfo;
 import com.yang.myapplication.entity.NeighborInfo;
+import com.yang.myapplication.http.UrlDomain;
+import com.yang.myapplication.service.MessageDB;
 
 import net.vidageek.mirror.dsl.Mirror;
 
 import org.litepal.LitePal;
 import org.litepal.tablemanager.callback.DatabaseListener;
 
+import java.io.IOException;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -46,10 +56,10 @@ public class DeviceListActivity extends AppCompatActivity {
     private ListView list_paired_devices,list_available_devices;
     private ArrayAdapter<String> adapterPairedDevice,adapterAvailableDevice;
     private Context context;
-    private BluetoothAdapter bluetoothAdapter;
+    private static BluetoothAdapter bluetoothAdapter;
     private ProgressBar progress_scan_devices;
-    private Button confirm;
     private static final String TAG = "DeviceListActivity";
+    DeviceInfo deviceInfo = MessageDB.getDeviceInfo();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,27 +67,46 @@ public class DeviceListActivity extends AppCompatActivity {
         setContentView(R.layout.activity_device_list);
         context = this;
         init();
-        initDB();
+//        isConnectOrNot();
     }
+    private boolean isConnect = true;
 
+    private void isConnectOrNot() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    InetAddress address = InetAddress.getByName(UrlDomain.pingURL);
+                    if (address.isReachable(10)) {
+                        isConnect = true;
+                    }else {
+                        isConnect = false;
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+    }
 
 
     private void init(){
         list_paired_devices = findViewById(R.id.list_paired_devices);
-        confirm= findViewById(R.id.confirm);
         list_available_devices = findViewById(R.id.list_available_devices);
         progress_scan_devices = findViewById(R.id.progress_scan_devices);
         adapterPairedDevice = new ArrayAdapter<String>(context,R.layout.device_list_item);
         adapterAvailableDevice = new ArrayAdapter<String>(context,R.layout.device_list_item);
-
         list_paired_devices.setAdapter(adapterPairedDevice);
         list_available_devices.setAdapter(adapterAvailableDevice);
-
-
         list_available_devices.setOnItemClickListener(mDeviceClickListener);
         list_paired_devices.setOnItemClickListener(mDeviceClickListener);
-
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        getPairedDevices();
+        registerReceiver(receiver, makeFilters());
+        deviceInfo = MessageDB.getDeviceInfo();
+    }
+    public void getPairedDevices(){
+        pairedDevicesSet = new HashSet<>();
         Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
         if(pairedDevices != null && pairedDevices.size()>0){
             for (BluetoothDevice device : pairedDevices){
@@ -86,48 +115,55 @@ public class DeviceListActivity extends AppCompatActivity {
             }
         } else {
             String noDevices = getResources().getText(R.string.none_paired).toString();
+            adapterPairedDevice.clear();
             adapterPairedDevice.add(noDevices);
         }
-
-        registerReceiver(receiver, makeFilters());
-
-        confirm.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Intent intent = new Intent();
-                String[] list = new String[macListConnect.size()];
-                for(int i = 0;i<macListConnect.size();i++){
-                    list[i] = macListConnect.get(i);
-                }
-                intent.putExtra(EXTRA_DEVICE_ADDRESS, list);
-                setResult(Activity.RESULT_OK, intent);
-                finish();
-            }
-        });
-
-
     }
     public static String EXTRA_DEVICE_ADDRESS = "deviceAddress";
-    private List<String> macListConnect = new ArrayList<>();
 
     private AdapterView.OnItemClickListener mDeviceClickListener  = new AdapterView.OnItemClickListener() {
         public void onItemClick(AdapterView<?> av, View v, int arg2, long arg3) {
             bluetoothAdapter.cancelDiscovery();
             String info = ((TextView) v).getText().toString();
             String address = info.substring(info.length() - 17);
-//            if(!macListConnect.contains(address)) macListConnect.add(address);
-            Intent intent = new Intent();
-            intent.putExtra(EXTRA_DEVICE_ADDRESS, address);
-            setResult(Activity.RESULT_OK, intent);
-            finish();
+            BluetoothDevice device = allDevices.get(address);
+
+            if(deviceInfo == null){
+                String notification = "sorry, you haven't login";
+                Toast.makeText(context, notification, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if(device!=null){
+
+
+
+
+                if (!isConnect){
+                    Toast.makeText(context, "cannot join", Toast.LENGTH_SHORT).show();
+                    return;
+                }else {
+                    BluetoothTools.pair(device);
+                    getPairedDevices();
+                    pairedmap.put("MAC",device.getAddress());
+                    pairedmap.put("name",device.getName());
+                }
+
+
+
+                //配对成功，上传邻居name，寻找MANET_UUID
+            }
+//            Intent intent = new Intent();
+//            intent.putExtra(EXTRA_DEVICE_ADDRESS, address);
+//            setResult(Activity.RESULT_OK, intent);
+//            finish();
         }
     };
 
+    HashMap<String,String> pairedmap = new HashMap<>();
 
-    Set<String> macList = new HashSet<>();
+
     HashMap<String,BluetoothDevice> allDevices = new HashMap<>();
-    HashMap<String,Integer> rssiList = new HashMap<>();
-    Set<BluetoothDevice> pairedDevicesSet = new HashSet<>();
+    static Set<BluetoothDevice> pairedDevicesSet = new HashSet<>();
 
     BroadcastReceiver receiver = new BroadcastReceiver() {
         @SuppressLint("NotifyDataSetChanged")
@@ -137,16 +173,14 @@ public class DeviceListActivity extends AppCompatActivity {
             String action = intent.getAction();
             if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
                 Log.e(TAG, "开始搜索");
-
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 Log.e(TAG, "查找到设备完成");
                 progress_scan_devices.setVisibility(View.GONE);
                 if(adapterAvailableDevice.getCount() == 0){
-                    Toast.makeText(context, "No device found", Toast.LENGTH_SHORT).show();
+//                    Toast.makeText(context, "No device found", Toast.LENGTH_SHORT).show();
                 }else {
-                    Toast.makeText(context, "Click on the device to start to chat", Toast.LENGTH_SHORT).show();
+//                    Toast.makeText(context, "Click on the device to start to chat", Toast.LENGTH_SHORT).show();
                 }
-                updateSql();
             } else if (BluetoothDevice.ACTION_FOUND.equals(action)) {
                 String name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME);
                 if (name != null) {
@@ -154,27 +188,17 @@ public class DeviceListActivity extends AppCompatActivity {
                     BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                     if(!allDevices.containsKey(device.getAddress())){
                         allDevices.put(device.getAddress(),device);
-                        rssiList.put(device.getAddress(),rssi);
-                    }
+                        adapterAvailableDevice.add(device.getName()+"\n"+device.getAddress());
 
+                    }
                     String s = "";
                     int BondState = device.getBondState();
-
-                    if(!macList.contains(device.getAddress())) {
-                        macList.add(device.getAddress());
-                        adapterAvailableDevice.add(device.getName()+"\n"+device.getAddress());
-                    }
                     switch (BondState){
                         case BluetoothDevice.BOND_BONDED:
                             s = "信号："+ rssi +"---设备名：" + device.getName() + "\n" + "设备地址：" + device.getAddress() + "\n" + "连接状态：已配对" + "\n";
                             break;
                         default:
                             s = "信号："+ rssi +"---设备名：" + device.getName() + "\n" + "设备地址：" + device.getAddress() + "\n" + "连接状态：未知" + "\n";
-//                           if(!macList.contains(device.getAddress())) {
-//                               macList.add(device.getAddress());
-//                               adapterAvailableDevice.add(device.getName()+"\n"+device.getAddress());
-//                           }
-
                             break;
                     }
                     Log.e(TAG,s);
@@ -199,7 +223,12 @@ public class DeviceListActivity extends AppCompatActivity {
                 }
                 int status = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE,0);
                 if (status == BluetoothDevice.BOND_BONDED) {
-                    Log.e(TAG,"绑定设备完成: " + remoteDevice.getName());
+                    if( isConnect){
+                        Log.e(TAG,"绑定设备完成: " + remoteDevice.getName());
+                        List<HashMap<String,String>> macList = new ArrayList<>();
+                        macList.add(pairedmap);
+//                        RouterTool.updateRouter(macList,"pair",deviceInfo);
+                    }
                 } else if (status == BluetoothDevice.BOND_BONDING) {
                     Log.e(TAG,"绑定设备中: " + remoteDevice.getName());
                 } else if (status == BluetoothDevice.BOND_NONE) {
@@ -231,28 +260,9 @@ public class DeviceListActivity extends AppCompatActivity {
                 }
             }
         }
-
-
-        private void updateSql() {
-
-        }
-        private void updateView() {
-        }
     };
 
-    private void initDB() {
-        LitePal.initialize(this);
-        SQLiteDatabase db = LitePal.getDatabase();
-        LitePal.registerDatabaseListener(new DatabaseListener() {
-            @Override
-            public void onCreate() {
-            }
 
-            @Override
-            public void onUpgrade(int oldVersion, int newVersion) {
-            }
-        });
-    }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -262,21 +272,78 @@ public class DeviceListActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        Intent intent = null;
         switch (item.getItemId()){
             case R.id.menuScan:
                 scanDevices();
                 break;
+//            case R.id.menuLeave:
+//                leaveCurrentMANET();
+//                break;
+            case R.id.menuBack:
+                intent = new Intent(DeviceListActivity.this,BluetoothChat.class);
+                startActivity(intent);
+                break;
+
+//            case R.id.menuCreate:
+//                createAMANET();
+//                break;
+
 
         }
         return true;
     }
 
+    private void leaveCurrentMANET() {
+        if (!isConnect){
+            Toast.makeText(context, "cannot leave", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(DeviceListActivity.this);
+        builder.setTitle("Leave the current network？");
+        builder.setMessage("Do you really want to exit？");
+        builder.setNegativeButton("NO", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                String notification = "cancel";
+                Toast.makeText(context, notification, Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.setPositiveButton("YES", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                finish();
+                String notification = null;
+                List<HashMap<String,String>> macList = new ArrayList<>();
+                if(deviceInfo == null){
+                    notification = "sorry, you haven't login";
+                    Toast.makeText(context, notification, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                for (BluetoothDevice device : pairedDevicesSet){
+                    if(BluetoothTools.unpair(device)){
+                        notification = "leave";
+                        HashMap<String,String> map = new HashMap<>();
+                        map.put("MAC",device.getAddress());
+                        map.put("name",device.getName());
+                        macList.add(map);
+                        Toast.makeText(context, notification, Toast.LENGTH_SHORT).show();
+                    }
+                }
+//                RouterTool.updateRouter(macList,"unpaired", deviceInfo);
+                adapterPairedDevice.clear();
+            }
+        });
+        builder.create().show();
+    }
+
+
     private void scanDevices(){
-        macListConnect = new ArrayList<>();
         progress_scan_devices.setVisibility(View.VISIBLE);
         adapterAvailableDevice.clear();
+        adapterPairedDevice.clear();
+        getPairedDevices();
         Toast.makeText(context, "Scan starts", Toast.LENGTH_SHORT).show();
-
         if(bluetoothAdapter.isDiscovering()){
             bluetoothAdapter.cancelDiscovery();
         }

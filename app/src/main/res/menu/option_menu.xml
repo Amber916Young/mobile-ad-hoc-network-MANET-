@@ -19,7 +19,6 @@
         android:title="@string/str_menu_bluetooth_on"
         app:showAsAction="always" />
 
-
     <item
         android:id="@+id/historyMsg"
         android:icon="@android:drawable/ic_menu_recent_history"

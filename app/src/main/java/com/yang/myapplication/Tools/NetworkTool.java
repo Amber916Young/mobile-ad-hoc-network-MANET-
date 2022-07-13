@@ -1,13 +1,19 @@
 package com.yang.myapplication.Tools;
 
+import com.yang.myapplication.http.UrlDomain;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.Collections;
 import java.util.List;
 
 public class NetworkTool {
+
+
+
 
     /**
      * @param target_name IP address or domain name
