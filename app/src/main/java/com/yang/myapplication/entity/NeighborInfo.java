@@ -8,19 +8,50 @@ import java.io.Serializable;
 import java.util.Date;
 
 public class NeighborInfo extends LitePalSupport implements Serializable {
+    public static int onLine = 1;
+    public static int offLine = 0;
     private int hop;
     private Date timestamp;
 //    private int rssi;
     private String neighborMac;
     private String neighborName;
     private String path;
+    private String lastMessage;
+    private String lastTime;
+    private int   connection_status;
 
-    public NeighborInfo(String neighborMac, String neighborName, int hop, Date timestamp,String path) {
+    public int getConnection_status() {
+        return connection_status;
+    }
+
+    public void setConnection_status(int connection_status) {
+        this.connection_status = connection_status;
+    }
+
+    public String getLastMessage() {
+        return lastMessage;
+    }
+
+    public void setLastMessage(String lastMessage) {
+        this.lastMessage = lastMessage;
+    }
+
+    public String getLastTime() {
+        return lastTime;
+    }
+
+    public void setLastTime(String lastTime) {
+        this.lastTime = lastTime;
+    }
+
+    public NeighborInfo(String neighborMac, String neighborName, int hop, Date timestamp, String path) {
         this.neighborMac = neighborMac;
         this.neighborName = neighborName;
         this.hop = hop;
         this.timestamp = timestamp;
         this.path = path;
+        this.lastMessage = "";
+        this.lastTime = "";
     }
 
     public String getPath() {

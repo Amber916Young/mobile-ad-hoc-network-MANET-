@@ -14,7 +14,6 @@ import org.litepal.LitePal;
 import java.util.HashMap;
 import java.util.Objects;
 
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import rxhttp.RxHttp;
 
 public class LoginTool {
@@ -49,7 +48,7 @@ public class LoginTool {
                         String MANET_UUID = Objects.requireNonNull(map.get("manet_UUID")).toString();
                         deviceInfo = new DeviceInfo(uuid,username,password,MAC,loginDate,registerDate,status,MANET_UUID,role);
                         deviceInfo.save();
-                        BluetoothChat.isupdateUser = true;
+//                        BluetoothChat.isupdateUser = true;
                     }
                 }, throwable -> {
                     Log.e(TAG,throwable.toString());

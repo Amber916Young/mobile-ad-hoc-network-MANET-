@@ -9,10 +9,6 @@
         android:icon="@android:drawable/ic_menu_delete"
         android:title="@string/str_menu_msg_clear"
         app:showAsAction="always" />
-    <item
-        android:id="@+id/menuBack"
-        android:icon="@android:drawable/ic_menu_revert"
-        android:title="@string/str_menu_msg_back"
-        app:showAsAction="always" />
+
 
 </menu>

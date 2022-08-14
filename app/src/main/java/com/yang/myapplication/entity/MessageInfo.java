@@ -1,27 +1,95 @@
 package com.yang.myapplication.entity;
 
 
+import android.graphics.Bitmap;
+
 import com.yang.myapplication.Tools.RandomID;
 
+import org.litepal.annotation.Column;
 import org.litepal.crud.LitePalSupport;
 
+import java.io.File;
 import java.io.Serializable;
 import java.util.Date;
 
 public class MessageInfo extends LitePalSupport implements Serializable {
+    public static final int DATA_IMAGE = 2;
+    public static final int DATA_AUDIO = 3;
+    public static final int DATA_TEXT = 1;
+
+    @Column(unique = true, defaultValue = "unknown")
     private String  uuid;
-    private String content;
+    private Object content;
+    public String message;
     private String sendDate;
-    private String readDate;
-    private int isRead; // 0 no 1 already
-    private int isUpload; // 0 no 1 already
+    private String readDate = "END";
+    private int isRead; // 0 no 1 already read by the target
+    private int isUpload; // 0 no 1 already upload to cloud
+    public Bitmap imageBitmap;
+    public File audioFile;
+    public int dataType;
     private String targetName;
     private String targetMAC;
     private String sourceName;
     private String sourceMAC;
+    private String routeList;
 
 
-    public MessageInfo( String uuid, String content, String sendDate, String readDate, int isRead, String targetName, String targetMAC, String sourceName, String sourceMAC) {
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public Bitmap getImageBitmap() {
+        return imageBitmap;
+    }
+
+    public void setImageBitmap(Bitmap imageBitmap) {
+        this.imageBitmap = imageBitmap;
+    }
+
+    public File getAudioFile() {
+        return audioFile;
+    }
+
+    public void setAudioFile(File audioFile) {
+        this.audioFile = audioFile;
+    }
+
+    public int getDataType() {
+        return dataType;
+    }
+
+    public void setDataType(int dataType) {
+        this.dataType = dataType;
+    }
+
+    public String getRouteList() {
+        return routeList;
+    }
+
+    public void setRouteList(String routeList) {
+        this.routeList = routeList;
+    }
+
+    public MessageInfo(String uuid, Object content, String sendDate, String readDate, int isRead, int isUpload, String targetName, String targetMAC, String sourceName, String sourceMAC, String routeList) {
+        this.uuid = uuid;
+        this.content = content;
+        this.sendDate = sendDate;
+        this.readDate = readDate;
+        this.isRead = isRead;
+        this.isUpload = isUpload;
+        this.targetName = targetName;
+        this.targetMAC = targetMAC;
+        this.sourceName = sourceName;
+        this.sourceMAC = sourceMAC;
+        this.routeList = routeList;
+    }
+
+    public MessageInfo(String uuid, Object content, String sendDate, String readDate, int isRead, String targetName, String targetMAC, String sourceName, String sourceMAC) {
         this.uuid = uuid;
         this.content = content;
         this.sendDate = sendDate;
@@ -37,7 +105,25 @@ public class MessageInfo extends LitePalSupport implements Serializable {
     public MessageInfo() {
     }
 
-    public MessageInfo(String uuid, String content, String sendDate, String readDate, int isRead, String targetName, String targetMAC, String sourceName, String sourceMAC, int isUpload) {
+    public MessageInfo(String uuid, Object content, String message, String sendDate, String readDate, int isRead, int isUpload, Bitmap imageBitmap, File audioFile, int dataType, String targetName, String targetMAC, String sourceName, String sourceMAC, String routeList) {
+        this.uuid = uuid;
+        this.content = content;
+        this.message = message;
+        this.sendDate = sendDate;
+        this.readDate = readDate;
+        this.isRead = isRead;
+        this.isUpload = isUpload;
+        this.imageBitmap = imageBitmap;
+        this.audioFile = audioFile;
+        this.dataType = dataType;
+        this.targetName = targetName;
+        this.targetMAC = targetMAC;
+        this.sourceName = sourceName;
+        this.sourceMAC = sourceMAC;
+        this.routeList = routeList;
+    }
+
+    public MessageInfo(String uuid, Object content, String sendDate, String readDate, int isRead, String targetName, String targetMAC, String sourceName, String sourceMAC, int isUpload) {
         this.uuid = uuid;
         this.content = content;
         this.sendDate = sendDate;
@@ -68,11 +154,11 @@ public class MessageInfo extends LitePalSupport implements Serializable {
         this.uuid = uuid;
     }
 
-    public String getContent() {
+    public Object getContent() {
         return content;
     }
 
-    public void setContent(String content) {
+    public void setContent(Object content) {
         this.content = content;
     }
 

@@ -7,7 +7,6 @@
     <!--  数据库对象  -->
     <list>
         <mapping class="com.yang.myapplication.entity.NeighborInfo"></mapping>
-        <mapping class="com.yang.myapplication.entity.TransferMessage"></mapping>
         <mapping class="com.yang.myapplication.entity.MessageInfo"></mapping>
         <mapping class="com.yang.myapplication.entity.DeviceInfo"></mapping>
     </list>

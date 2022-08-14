@@ -19,4 +19,9 @@
     <string name="str_available_devices">Available</string>
 
 
+    <string name="record">Record</string>
+    <string name="message_hint">Say hello!</string>
+    <string name="image_description">Photo from the gallery</string>
+
+
 </resources>

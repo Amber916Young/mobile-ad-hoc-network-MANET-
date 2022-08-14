@@ -97,7 +97,15 @@ public class HistoryMessageAdapter extends ArrayAdapter<MessageInfo> {
             viewHolder.targetName.setText(msg.getTargetName());
             viewHolder.targetMAC.setText(msg.getTargetMAC());
             viewHolder.Sendtime.setText(msg.getSendDate());
-            viewHolder.content.setText(msg.getContent());
+            if(msg.getDataType() == 1 ){
+                viewHolder.content.setText(msg.getMessage().toString());
+            }else if(msg.getDataType() == 2 ){
+                viewHolder.content.setText("[image message]");
+            }else {
+                viewHolder.content.setText("[audio message]");
+            }
+
+
 
             if(!msg.getReadDate().equals("END"))
                 viewHolder.Readtime.setText(msg.getReadDate());
