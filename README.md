@@ -12,4 +12,8 @@ For traditional MANETs there are many challenges in managing MANETs as the mobil
 
 ### two cloud services
 1. Using graph algorithms to form network topology diagrams to update routing tables in real-time for each mobile device in a faster and more accurate way, even if some devices are not connected to the network, they can be updated by connected neighbouring devices, which greatly increases the speed of routing table updates, and also when some devices lose their signal, the cloud can update the network structure in a short time, reducing the probability of routing table errors.
+2. Use the cloud database to store transmission data. Although this does not require any logic to be used, it is very effective in multi-hop communication to ensure that messages are ready to be delivered to and returned from the destination.
+
 ## Functions
+    <img width="1469" alt="image" src="https://user-images.githubusercontent.com/57694784/186414019-ace6e21b-5d44-4fe1-92db-bdcdfdc28807.png">
+<img width="1602" alt="image" src="https://user-images.githubusercontent.com/57694784/186414051-25d5ba16-b569-45b7-81dd-eb94948f785e.png">
