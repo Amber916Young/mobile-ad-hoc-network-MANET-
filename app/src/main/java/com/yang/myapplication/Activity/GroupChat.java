@@ -10,6 +10,7 @@ import android.os.Message;
 import android.util.Log;
 import android.widget.Toast;
 
+import static com.yang.myapplication.Activity.BluetoothChat.neighborInfoList;
 import static com.yang.myapplication.Activity.ChatMainActivity.isupdateView;
 import static com.yang.myapplication.entity.MessageInfo.DATA_IMAGE;
 import static com.yang.myapplication.entity.MessageInfo.DATA_TEXT;
@@ -51,24 +52,6 @@ public class GroupChat {
     String groupUserNames = "";
     private final static String TAG = "GroupChat";
     Handler handler = null;
-    public void newAdd(NeighborInfo user ,Handler handler){
-        if(deviceConnections.containsKey(user.getNeighborMac()) && deviceConnections.get(user.getNeighborMac())){
-            return;
-        }
-        String mac = user.getNeighborMac();
-        String name = user.getNeighborName();
-        this.handler = handler;
-        ChatUtils chatService = new ChatUtils(handler);
-        deviceConnections.put(mac, false);
-        groupId += mac + "\n";
-        groupUserNames += name + "\n";
-        if (chatService.getState() == ChatUtils.STATE_NONE) {
-            chatService.setMAC(mac);
-            chatService.setName(name);
-            chatService.start();
-        }
-        chatSockets.add(chatService);
-    }
 
     public Handler getHandler() {
         return handler;
@@ -175,7 +158,6 @@ public class GroupChat {
                 if(list.size()>1){
 //                    socket.write(list);
                 }
-                continue;
             }else {
                 String mac = socket.getMAC();
                 BluetoothDevice device = adapter.getRemoteDevice(mac);
@@ -184,10 +166,21 @@ public class GroupChat {
             }
         }
     }
+    public void broadcastNeighbourInfo(){
+        List<NeighborInfo> list = LitePal.findAll(NeighborInfo.class);
+        this.membership = list;
+        for (int i = 0; i < chatSockets.size(); i++) {
+            ChatUtils socket = chatSockets.get(i);
+            if (socket.getState() == ChatUtils.STATE_CONNECTED) {
+                if(list.size()>1){
+//                    socket.write(list);
+                }
+            }
+        }
+    }
 
 
     public synchronized void startConnection( List<NeighborInfo> list,String name ) {
-        System.out.println("重连");
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         this.membership = list;
         for (ChatUtils socket : chatSockets) {
@@ -354,7 +347,7 @@ public class GroupChat {
             ChatUtils service = res.getData();
             reConnect3TimesMiddle(service, device, message, dataType);
         } else if (res.getCode() == NoneSocket) {
-            ChatUtils service = newAdd(device);
+            ChatUtils service =  newAdd(device);
             reConnect3TimesMiddle(service, device, message, dataType);
         }
     }

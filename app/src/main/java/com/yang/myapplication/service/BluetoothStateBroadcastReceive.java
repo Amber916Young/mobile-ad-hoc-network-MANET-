@@ -32,22 +32,22 @@ public class BluetoothStateBroadcastReceive extends BroadcastReceiver {
                 blueToothInterface.searchFinish();
                 break;
             case BluetoothDevice.ACTION_ACL_CONNECTED:
-                Log.i(TAG, device.getName() + "已连接");
+                Log.i(TAG, device.getName() + "connected");
                 blueToothInterface.getConnectedBlueToothDevices(device);
                 break;
             case BluetoothDevice.ACTION_ACL_DISCONNECTED:
-                Log.i(TAG, device.getName() + "已断开");
+                Log.i(TAG, device.getName() + "disconnect");
                 blueToothInterface.getDisConnectedBlueToothDevices(device);
                 break;
             case BluetoothAdapter.ACTION_STATE_CHANGED:
                 int blueState = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, 0);
                 switch (blueState) {
                     case BluetoothAdapter.STATE_OFF:
-                        Log.i(TAG, "蓝牙已关闭");
+                        Log.i(TAG, "disable BLE");
                         blueToothInterface.disable();
                         break;
                     case BluetoothAdapter.STATE_ON:
-                        Log.i(TAG, "蓝牙已开启");
+                        Log.i(TAG, "enable BLE");
                         blueToothInterface.open();
                         break;
                 }

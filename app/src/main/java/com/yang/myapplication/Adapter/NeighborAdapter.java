@@ -87,7 +87,7 @@ public class NeighborAdapter extends  RecyclerView.Adapter<NeighborAdapter.ViewH
         }
 
 //        holder.neighborName.setTextColor(Color.CYAN);
-        String hop = "(distance:"+String.valueOf(current.getHop())+" hop)";
+        String hop = "(distance:"+String.valueOf(current.getHop())+" hop(s))";
 
 
 
@@ -108,7 +108,7 @@ public class NeighborAdapter extends  RecyclerView.Adapter<NeighborAdapter.ViewH
 //        holder.timestamp.setText(current.getTimestamp().toString());
 //        holder.rssi.setText(String.valueOf(current.getRssi()));
 //        holder.myMac.setText(current.getMyMac());
-//        holder.myName.setText(current.getMyName());
+//        holder.myNaRefer tome.setText(current.getMyName());
     }
 
 

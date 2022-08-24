@@ -1,5 +1,6 @@
 package com.yang.myapplication.Tools;
 
+import android.os.Message;
 import android.util.Log;
 
 import com.yang.myapplication.Activity.BluetoothChat;
@@ -48,11 +49,14 @@ public class LoginTool {
                         String MANET_UUID = Objects.requireNonNull(map.get("manet_UUID")).toString();
                         deviceInfo = new DeviceInfo(uuid,username,password,MAC,loginDate,registerDate,status,MANET_UUID,role);
                         deviceInfo.save();
-//                        BluetoothChat.isupdateUser = true;
+
                     }
+                    BluetoothChat.isupdateUser = true;
                 }, throwable -> {
                     Log.e(TAG,throwable.toString());
+                    BluetoothChat.isupdateUser = true;
 
                 });
+
     }
 }

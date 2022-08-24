@@ -16,6 +16,7 @@ public class MessageInfo extends LitePalSupport implements Serializable {
     public static final int DATA_IMAGE = 2;
     public static final int DATA_AUDIO = 3;
     public static final int DATA_TEXT = 1;
+    public static final int DATA_MEMBER = 4;
 
     @Column(unique = true, defaultValue = "unknown")
     private String  uuid;

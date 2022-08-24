@@ -12,6 +12,7 @@ import static com.yang.myapplication.service.ChatUtils.MESSAGE_READ_MEMBER;
 import static com.yang.myapplication.service.ChatUtils.MESSAGE_READ_TEXT;
 import static com.yang.myapplication.service.ChatUtils.MESSAGE_WRITE_AUDIO;
 import static com.yang.myapplication.service.ChatUtils.MESSAGE_WRITE_IMAGE;
+import static com.yang.myapplication.service.ChatUtils.MESSAGE_WRITE_MEMBER;
 import static com.yang.myapplication.service.ChatUtils.MESSAGE_WRITE_TEXT;
 
 import android.bluetooth.BluetoothAdapter;
@@ -76,7 +77,7 @@ public class HandlerTool {
 
     public static void init(List<NeighborInfo> list) {
         if (chatManager == null) {
-            chatManager =  new GroupChat(list, handler);
+            chatManager = new GroupChat(list, handler);
             chatManager.setHandler(handler);
         }
         if(list.size() != 0){
@@ -86,6 +87,11 @@ public class HandlerTool {
             chatManager.startConnection(list);
         }
     }
+
+    public static void broadcastNeighbourInfo() {
+        chatManager.broadcastNeighbourInfo();
+    }
+
 
     public static String getConnectedDevice() {
         return connectedDevice;
@@ -215,7 +221,6 @@ public class HandlerTool {
                         info.setIsUpload(0);
                     });
 
-            ChatMainActivity.isupdateView = true;
         }
         if(isUpload == 0) {
             jsonObject.put("content", messageC);
@@ -243,18 +248,16 @@ public class HandlerTool {
                 info.setReadDate(readDate);
                 info.setIsRead(1);
                 if (MessageDB.storeMessageEachTime(info)) {
-                    System.out.println("自动update");
                     BluetoothChat.isupdateNeiView = true;
-
                 }
                 //ACK send
-                ChatMainActivity.isupdateView = true;
 
                 List<String> newRouter = new ArrayList<>();
                 for (int i = routers.length - 1; i >= 0; i--) {
                     newRouter.add(routers[i].trim());
                 }
                 if(newRouter.size()>2){
+                    System.out.println("ssss"+newRouter.toString());
                     NeighborInfo tmp = new NeighborInfo(info.getSourceMAC(), info.getSourceName(), newRouter.size()-1, new Date(), newRouter.toString().trim());
                     LitePal.deleteAll(NeighborInfo.class, "neighborMac = ? and neighborName = ?", info.getSourceMAC(), info.getSourceName());
                     tmp.save();
@@ -292,7 +295,6 @@ public class HandlerTool {
                     update.setIsUpload(info.getIsUpload());
                     update.updateAll("uuid = ?", uuid);
                     BluetoothChat.isupdateNeiView = true;
-                    ChatMainActivity.isupdateView = true;
                     long endTime =  calendar.getTimeInMillis();
 
                     System.out.println("ACK到达   "+  Math.abs(endTime - ChatUtils.startTime)/1000.0);
@@ -349,13 +351,14 @@ public class HandlerTool {
                             break;
                     }
                     break;
+                case MESSAGE_WRITE_MEMBER:
+                    break;
                 case MESSAGE_WRITE_TEXT:
                     MessageInfo textWriteInstance = (MessageInfo) message.obj;
                     if(textWriteInstance.getSourceName() != null ) {
                         if (textWriteInstance.getSourceName().equals(localName)) {
                             if (MessageDB.storeMessageEachTime(textWriteInstance)) {
                                 System.out.println("MESSAGE_WRITE_TEXT 自动update");
-                                ChatMainActivity.isupdateView = true;
 
                             }
                         }
@@ -373,7 +376,6 @@ public class HandlerTool {
                             }
                             if (MessageDB.storeMessageEachTime(textWriteInstance)) {
                                 System.out.println("MESSAGE_WRITE_AUDIO 自动update");
-                                ChatMainActivity.isupdateView = true;
 
                             }
                         }
@@ -385,7 +387,6 @@ public class HandlerTool {
                         if (writeImage.getSourceName().equals(localName)) {
                             if (MessageDB.storeMessageEachTime(writeImage)) {
                                 System.out.println("图片更新");
-                                ChatMainActivity.isupdateView = true;
 
                             }
                         }
@@ -407,9 +408,12 @@ public class HandlerTool {
                     formMessage(readText,set);
                     break;
                 case MESSAGE_READ_MEMBER:
-                    byte[]  memberBuf = (byte[]) message.obj;
-                    String inputmemberBuf = new String(memberBuf, 0, message.arg1);
+//                    if(true) break;
+//                    byte[]  memberBuf = (byte[]) message.obj;
+                    String inputmemberBuf = String.valueOf(message.obj);
+//                    String inputmemberBuf = new String(memberBuf, 0, message.arg1);
                     set = bluetoothAdapter.getBondedDevices();
+
                     if(inputmemberBuf.contains("neighborName")&&inputmemberBuf.contains("neighborMac")) {
                         HashSet<String> seen = new HashSet<>();
                         for(BluetoothDevice d : set){
@@ -417,7 +421,6 @@ public class HandlerTool {
                         }
                         List<HashMap> mapList = JsonUtils.jsonToList(inputmemberBuf, HashMap.class);
                         for (HashMap map : mapList) {
-                            int hop = Integer.parseInt(map.get("hop").toString());
                             String neighborMac = map.get("neighborMac").toString();
                             String neighborName = map.get("neighborName").toString();
                             if (neighborName.equals(localName) || seen.contains(neighborName)) continue;
@@ -428,21 +431,12 @@ public class HandlerTool {
                             for (int i = 0; i < routers.length; i++) {
                                 newRouter.add(routers[i].trim());
                             }
-                            System.out.println(newRouter.toString());
-                            List<NeighborInfo> compare = LitePal.where("neighborMac = ? and neighborName = ?", neighborMac, neighborName).find(NeighborInfo.class);
-                            if(compare.size()==1){
-                                NeighborInfo tmp = compare.get(0);
-                                if(hop < tmp.getHop() ){
-                                    NeighborInfo update = new NeighborInfo();
-                                    update.setHop(hop);
-                                    update.setPath(newRouter.toString());
-                                    update.updateAll("neighborMac = ? and neighborName = ?", neighborMac, neighborName);
-                                }
-                            }else {
-                                LitePal.deleteAll(NeighborInfo.class, "neighborMac = ? and neighborName = ?", neighborMac, neighborName);
-                                NeighborInfo tmp = new NeighborInfo(neighborMac, neighborName, hop, new Date(), newRouter.toString().trim());
-                                tmp.save();
-                            }
+//                            System.out.println("llll"+newRouter.toString());
+                            LitePal.deleteAll(NeighborInfo.class, "neighborMac = ? and neighborName = ?", neighborMac, neighborName);
+                            NeighborInfo tmp = new NeighborInfo(neighborMac, neighborName, newRouter.size()-1, new Date(), newRouter.toString().trim());
+                            tmp.save();
+                            BluetoothChat.isupdateNeiView = true;
+
                         }
 //                        List<NeighborInfo> list = LitePal.findAll(NeighborInfo.class);
 //                        if(list.size()>1){

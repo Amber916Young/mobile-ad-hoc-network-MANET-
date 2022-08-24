@@ -246,18 +246,12 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
 
 
     private void cloudNotification() {
-//        Timer timer = new Timer();
-//        timer.schedule(new TimerTask() {
-//            public void run() {
-//                isupdateMessage = true;
-//            }
-//        }, 1000,   60*1000);
         Timer timer2 = new Timer();
         timer2.schedule(new TimerTask() {
             public void run() {
                 scanDevices();
             }
-        }, 120000, 600 * 1000);
+        }, 120000, 300 * 1000);
 
         Timer timerViewupdate = new Timer();
         timerViewupdate.schedule(new TimerTask() {
@@ -268,19 +262,28 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
                     handlerView.sendMessage(msg);
                     isupdateNeiView = false;
                 }
-                if (isupdateMessage) {
+                if (isupdateUser) {
                     Message msg = new Message();
-                    msg.arg1 = 3;
+                    msg.arg1 = 4;
                     handlerView.sendMessage(msg);
-                    isupdateMessage = false;
+                    isupdateUser = false;
                 }
-
             }
         }, 0, 300);
+
+        Timer uplaodunread = new Timer();
+        uplaodunread.schedule(new TimerTask() {
+            public void run() {
+                Message msg = new Message();
+                msg.arg1 = 3;
+                handlerView.sendMessage(msg);
+                HandlerTool.broadcastNeighbourInfo();
+            }
+        }, 10000, 120*1000);
     }
 
     //处理界面
-    private Handler handlerView = new Handler() {
+    public  Handler handlerView = new Handler() {
         public void handleMessage(android.os.Message msg) {
             if (msg.arg1 == 1) {
                 allDevices.clear();
@@ -293,16 +296,24 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
             } else if (msg.arg1 == 3) {
                 MessageDB.checkUnSendOrUnreadMessage(localName, localMacAddress);
             } else if (msg.arg1 == 4) {
-                List<DeviceInfo> list = LitePal.findAll(DeviceInfo.class);
-                if (list.size() == 1) {
-                    deviceInfo = list.get(0);
+                deviceInfo = LitePal.findFirst(DeviceInfo.class);
+                if(deviceInfo.getUsername().equals("KFW")){
+                    tmp.findItem(R.id.ownInfo).setIcon(R.drawable.ik);
+                }else if(deviceInfo.getUsername().equals("B")){
+                    tmp.findItem(R.id.ownInfo).setIcon(R.drawable.ib);
+                }else if(deviceInfo.getUsername().equals("C")){
+                    tmp.findItem(R.id.ownInfo).setIcon(R.drawable.ic);
+                }else if(deviceInfo.getUsername().equals("D")){
+                    tmp.findItem(R.id.ownInfo).setIcon(R.drawable.id);
+                }else {
+                    tmp.findItem(R.id.ownInfo).setIcon(R.drawable.ig);
                 }
             }
         }
     };
 
     public static boolean isupdateNeiView = false;
-    public static boolean isupdateMessage = false;
+    public static boolean isupdateUser = false;
 
 
     private void initDB() {
@@ -380,9 +391,12 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
         Log.e(TAG, "onResume");
     }
 
+    static private Menu tmp = null;
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.option_menu, menu);
+        tmp = menu;
+
         return true;
     }
 
@@ -434,11 +448,14 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
             case R.id.discoverable:
                 bluetoothUtil.bluetoothEnable();
                 Toast.makeText(context, "Clicked enable", Toast.LENGTH_SHORT).show();
-                viewDeviceInfo();
+//                viewDeviceInfo();
                 break;
-            case R.id.historyMsg:
-                intent = new Intent(context, MessageListActivity.class);
-                startActivity(intent);
+//            case R.id.historyMsg:
+//                intent = new Intent(context, MessageListActivity.class);
+//                startActivity(intent);
+//                break;
+            case R.id.ownInfo:
+                viewDeviceInfo();
                 break;
         }
         return true;
@@ -469,7 +486,6 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
     protected void onStop() {
         super.onStop();
         Log.e(TAG, "onStop");
-        isupdateMessage = false;
     }
 
 
@@ -483,7 +499,6 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
         }
         unregisterBluetoothReceiver();
         bluetoothUtil.close();
-        isupdateMessage = false;
     }
 
 
@@ -533,6 +548,14 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
                 printLog(device);
             }
         }
+        @Override
+        public void searchFinish() {
+            Log.e(TAG, "Find device completely");
+            progress_scan_devices.setVisibility(View.GONE);
+            bluetoothUtil.close();
+            unregisterBluetoothReceiver();
+            getPairedDevices();
+        }
 
         @Override
         public void getConnectedBlueToothDevices(BluetoothDevice device) {
@@ -544,14 +567,6 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
             Log.i(TAG, "Disconnect");
         }
 
-        @Override
-        public void searchFinish() {
-            Log.e(TAG, "Find device completely");
-            progress_scan_devices.setVisibility(View.GONE);
-            bluetoothUtil.close();
-            unregisterBluetoothReceiver();
-            getPairedDevices();
-        }
 
         @Override
         public void open() {
@@ -589,8 +604,8 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
 
     private void noNetworkOnlyGetOneHopNode(List<NeighborInfo> neighborInfoList) {
         LitePal.deleteAll(NeighborInfo.class);
-        pairedDevicesSet.clear();
-        pairedDevicesSet = bluetoothUtil.getDevicesList();
+//        pairedDevicesSet.clear();
+//        pairedDevicesSet = bluetoothUtil.getDevicesList();
 
         for (NeighborInfo device : neighborInfoList){
             String address = device.getNeighborMac();
@@ -607,7 +622,7 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
         }
         HandlerTool.setLocalName(localName);
         HandlerTool.setLocalMacAddress(localMacAddress);
-
+        HandlerTool.broadcastNeighbourInfo();
 //        for (BluetoothDevice device : pairedDevicesSet) {
 //            String address = device.getAddress();
 //            List<String> path = new ArrayList<>();
@@ -638,10 +653,10 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
         Log.e(TAG, s);
     }
 
-
+    public static List<NeighborInfo> neighborInfoList = new ArrayList<>();
 
     private void getPairedDevices() {
-        List<NeighborInfo> neighborInfoList = new ArrayList<>();
+        neighborInfoList.clear();
         for (BluetoothDevice device : pairedDevicesSet) {
             String address = device.getAddress();
             List<String> path = new ArrayList<>();
@@ -650,13 +665,14 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
             NeighborInfo neighbor = new NeighborInfo(address, device.getName(), 1, new Date(), path.toString());
             neighborInfoList.add(neighbor);
         }
+        List<NeighborInfo> morethanonehop = LitePal.where("hop > ?","1").find(NeighborInfo.class);
+        for(NeighborInfo info : morethanonehop){
+
+        }
         if(deviceInfo == null){
             deviceInfo = LitePal.findFirst(DeviceInfo.class);
         }
         if (deviceInfo != null) {
-            List<DeviceInfo> infos = LitePal.findAll(DeviceInfo.class);
-            RouterTool.setDeviceInfo(infos.get(0));
-            deviceInfo = infos.get(0);
             String mid = deviceInfo.getManet_UUID();
             if (neighborInfoList.size() != 0) {
                 try {
@@ -720,6 +736,7 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
                                 }
                                 HandlerTool.setLocalName(localName);
                                 HandlerTool.setLocalMacAddress(localMacAddress);
+                                HandlerTool.broadcastNeighbourInfo();
                                 new Timer().schedule(new TimerTask() {
                                     public void run() {
                                         isupdateNeiView = true;
@@ -740,5 +757,8 @@ public class BluetoothChat extends AppCompatActivity implements RecycleViewInter
 
 
 
+
+
     }
+
 }

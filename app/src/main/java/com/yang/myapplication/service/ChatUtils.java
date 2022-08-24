@@ -2,6 +2,7 @@ package com.yang.myapplication.service;
 import static com.yang.myapplication.Tools.HandlerTool.DEVICE_NAME;
 import static com.yang.myapplication.Tools.HandlerTool.MESSAGE_STATE_CHANGE;
 import static com.yang.myapplication.entity.MessageInfo.DATA_IMAGE;
+import static com.yang.myapplication.entity.MessageInfo.DATA_MEMBER;
 import static com.yang.myapplication.entity.MessageInfo.DATA_TEXT;
 import static com.yang.myapplication.entity.MessageInfo.DATA_AUDIO;
 import static com.yang.myapplication.Tools.HandlerTool.MESSAGE_TOAST;
@@ -458,6 +459,9 @@ public class ChatUtils {
                     }else if(dataType == DATA_IMAGE){
                         String entity = inData.readUTF();
                         handler.obtainMessage(MESSAGE_READ_IMAGE, -1, -1, entity).sendToTarget();
+                    } else if(dataType == DATA_MEMBER){
+                        String entity = inData.readUTF();
+                        handler.obtainMessage(MESSAGE_READ_MEMBER, -1, -1, entity).sendToTarget();
                     }
                 } catch (IOException e) {
                     Log.e(TAG, "disconnected", e);
@@ -580,13 +584,12 @@ public class ChatUtils {
 
         public void write(List<NeighborInfo> dataSent) {
             try {
-                Message writtenMsg = null;
                 handler.obtainMessage(MESSAGE_WRITE_MEMBER, -1, DATA_IMAGE, dataSent)
                         .sendToTarget();
-                mmOutStream.write(JsonUtils.objectToJson(dataSent).getBytes());
-                if (writtenMsg != null) {
-                    writtenMsg.sendToTarget();
-                }
+                OutData.writeInt(DATA_MEMBER);
+                OutData.writeUTF(JsonUtils.objectToJson(dataSent));
+//                mmOutStream.write(JsonUtils.objectToJson(dataSent).getBytes());
+
             } catch (IOException e) {
                 Log.e(TAG, "Error occurred when sending data", e);
                 Message writeErrorMsg = handler.obtainMessage(MESSAGE_TOAST);

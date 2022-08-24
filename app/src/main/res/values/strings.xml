@@ -12,6 +12,7 @@
     <string name="str_menu_scan_devices">Scan Devices</string>
     <string name="str_menu_msg_clear">Clear</string>
     <string name="str_menu_msg_back">Back</string>
+    <string name="str_menu_device_info">info</string>
 
 
     <string name="str_paired_devices">Paired</string>

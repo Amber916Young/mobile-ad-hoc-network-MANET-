@@ -125,7 +125,7 @@ public class ChatMainActivity extends AppCompatActivity {
         super.onStart();
         Log.e(TAG, "onStart");
         reloadConnectMember();
-        BluetoothChat.isupdateMessage = true;
+        reLoadMessageFromDB();
 //        Timer timer = new Timer();
 //        timer.schedule(new TimerTask() {
 //            public void run() {
@@ -135,6 +135,7 @@ public class ChatMainActivity extends AppCompatActivity {
     }
 
 
+    private String target = null;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -151,7 +152,7 @@ public class ChatMainActivity extends AppCompatActivity {
         reloadConnectList();
         initConfig() ;
         setState(currentConnectDevice.getNeighborName());
-
+        target = currentConnectDevice.getNeighborName();
         ActivityCompat.requestPermissions(this, new String[]{
                 Manifest.permission.RECORD_AUDIO}, REQUEST_RECORD_AUDIO_PERMISSION);
 
@@ -232,7 +233,6 @@ public class ChatMainActivity extends AppCompatActivity {
     private MediaRecorder mRecorder = null;
     private MediaPlayer mPlayer = null;
     public static String  fileName = null;
-    Bitmap imageBitmap;
     private static final int CAMERA_REQUEST = 1888;
     private static final int REQUEST_CONNECT_DEVICE = 3;
     private static final int MY_PERMISSION_REQUEST_READ_EXTERNAL_STORAGE = 2;
@@ -330,7 +330,6 @@ public class ChatMainActivity extends AppCompatActivity {
                     }
                     chatManager.sendMessage(buff, DATA_AUDIO,currentConnectDevice,
                             localName,localMacAddress,isUpload,txtWriteTime,nextrouters);
-
                     fis.close();
                 } catch (Exception e) {
                     Log.e(TAG, "Could not open stream to save data", e);
@@ -541,35 +540,22 @@ public class ChatMainActivity extends AppCompatActivity {
                         break;
                 }
             }
-
         }
     };
-
+    Timer timerViewupdate = new Timer();
     public void HandleTimer(){
-        Timer timerViewupdate = new Timer();
         timerViewupdate.schedule(new TimerTask() {
             public void run() {
                 Message msg = new Message();
-                if (isupdateView) {
-                    msg.arg1 = 0;
-                    mHandler.sendMessage(msg);
-                    isupdateView = false;
-                }
-//                if (isupdateTitleView) {
-//                    msg.arg1 = 1;
-//                    mHandler.sendMessage(msg);
-//                    isupdateTitleView = false;
-//                }
-//                if (isupdateUser) {
-//                    isupdateUser= false;
-//                }
+                msg.arg1 = 0;
+                mHandler.sendMessage(msg);
             }
-        }, 0, 300);
+        }, 0, 500);
     }
 
     //reload message from DB
     private void reLoadMessageFromDB() {
-        String target = currentConnectDevice.getNeighborName();
+//        String target = currentConnectDevice.getNeighborName();
         System.out.println(target +"---"+"Refresh the list again");
         List<MessageInfo> list = MessageDB.queryAllFromDB(target,localName);
         adapterMainChat = new MessageAdapter(context, R.layout.message, list);
@@ -623,8 +609,6 @@ public class ChatMainActivity extends AppCompatActivity {
     public void onBackPressed() {
         moveTaskToBack(true);
         isupdateView = false;
-        BluetoothChat.isupdateMessage = false;
-//        finish();
     }
 
 
@@ -642,7 +626,7 @@ public class ChatMainActivity extends AppCompatActivity {
         }
         Log.d("SecondActivity", "onDestroy");
         isupdateView = false;
-        BluetoothChat.isupdateMessage = false;
         finish();
+        timerViewupdate.cancel();
     }
 }
