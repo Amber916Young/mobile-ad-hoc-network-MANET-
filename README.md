@@ -20,7 +20,7 @@ For traditional MANETs there are many challenges in managing MANETs as the mobil
 #### Operations of devices
 1. Join/leave a MANET
 
-### Both operations based on radio distance, the user does not need to do anything, the cloud will automatically recognize that the user is in that MANET
+### Both operations based on radio distance, the user does not need to do anything, the cloud will automatically recognize that the user is in which MANET
 
 ## UI
 <img width="1469" alt="image" src="https://user-images.githubusercontent.com/57694784/186414129-65aba94b-dc88-4db8-82ad-5cf9f9925b15.png">
