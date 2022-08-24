@@ -29,6 +29,6 @@ For traditional MANETs there are many challenges in managing MANETs as the mobil
 ## Communication Object
 <img width="652" alt="image" src="https://user-images.githubusercontent.com/57694784/186415137-603a29dd-e23b-4a38-b962-c47c4ef00ebb.png">
 
-###The detail project is uploaded in my personal blog
+### The detail project is uploaded in my personal blog
 http://www.youngbird97.top/
 
